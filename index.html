@@ -279,15 +279,29 @@
 <body>
 <div id="app"></div>
 
-<script>
+<script type="module">
 /* =====================================================================
-   PORTAIL ARENA — application autonome (HTML + CSS + JS, sans dépendance)
-   Couche de données : localStorage pour l'instant.
-   -> Pour brancher une vraie base de données plus tard, il suffira de
-      remplacer le contenu des fonctions de la section "COUCHE DE DONNEES"
-      (loadData/saveData/loadSession/saveSession) par des appels fetch()
-      vers une API, sans toucher au reste de l'application.
+   PORTAIL ARENA — application autonome (HTML + CSS + JS)
+   Couche de données : Firestore (Firebase).
+   Le thème et la session (utilisateur connecté sur CET appareil) restent
+   en localStorage : ce sont des préférences locales, pas des données
+   partagées entre utilisateurs.
    ===================================================================== */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBPx5Vjanburd1YBFDh5BMCTSaImKdOga8",
+  authDomain: "arena-26281.firebaseapp.com",
+  projectId: "arena-26281",
+  storageBucket: "arena-26281.firebasestorage.app",
+  messagingSenderId: "464795101472",
+  appId: "1:464795101472:web:31442383a49ac8ecc84f45"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const PORTAL_DOC = doc(db, 'arena', 'portail');
 
 /* ---------------------------- ICONES (SVG) ---------------------------- */
 const ICONS = {
@@ -379,7 +393,6 @@ function parseContent(raw){
 }
 
 /* ---------------------------- COUCHE DE DONNEES ---------------------------- */
-const DATA_KEY = 'arena_portal_data_v1';
 const SESSION_KEY = 'arena_portal_session_v1';
 const THEME_KEY = 'arena_portal_theme_v1';
 const DATA_VERSION = 3;
@@ -446,10 +459,7 @@ function defaultData(){
         ]
       }
     ],
-    users: [
-      { id: uAdmin, username: 'admin', password: 'admin123', displayName: 'Administrateur ARENA', role: 'admin' },
-      { id: uProf,  username: 'prof',  password: 'prof123',  displayName: 'Compte professeur (démo)', role: 'user' }
-    ],
+   
     dossiers: {
       [uProf]: {
         situation: 'Corps : Certifié\nGrade : 3e classe — Échelon 7\nAffectation actuelle : Collège Sterling',
@@ -533,18 +543,28 @@ function migrateData(d){
     d._v = 3; changed = true;
   }
 
-  if(changed) localStorage.setItem(DATA_KEY, JSON.stringify(d));
-  return d;
+  return { d, changed };
 }
 
-function loadData(){
+async function loadData(){
   try{
-    const raw = localStorage.getItem(DATA_KEY);
-    if(!raw) { const d = defaultData(); localStorage.setItem(DATA_KEY, JSON.stringify(d)); return d; }
-    return migrateData(JSON.parse(raw));
-  }catch(e){ return defaultData(); }
+    const snap = await getDoc(PORTAL_DOC);
+    if(!snap.exists()){
+      const d = defaultData();
+      await setDoc(PORTAL_DOC, d);
+      return d;
+    }
+    const { d, changed } = migrateData(snap.data());
+    if(changed) await setDoc(PORTAL_DOC, d);
+    return d;
+  }catch(e){
+    console.error('Erreur de chargement Firestore :', e);
+    return defaultData();
+  }
 }
-function saveData(){ localStorage.setItem(DATA_KEY, JSON.stringify(data)); }
+function saveData(){
+  setDoc(PORTAL_DOC, data).catch(e => console.error('Erreur de sauvegarde Firestore :', e));
+}
 
 function loadSessionUserId(){
   try{ return localStorage.getItem(SESSION_KEY) || null; }catch(e){ return null; }
@@ -554,7 +574,8 @@ function saveSessionUserId(id){
 }
 
 /* ---------------------------- ETAT GLOBAL ---------------------------- */
-let data = loadData();
+document.getElementById('app').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:inherit;color:#666;">Chargement du portail…</div>';
+let data = await loadData();
 let session = null;
 (function initSession(){
   const id = loadSessionUserId();
@@ -692,10 +713,7 @@ function viewLogin(){
           </div>
           <button class="btn btn-primary" type="submit">Se connecter</button>
         </form>
-        <div class="login-demo">
-          <b>Comptes de démonstration</b> — admin&nbsp;: <b>admin</b> / <b>admin123</b> · personnel&nbsp;: <b>prof</b> / <b>prof123</b>.
-          Pensez à changer ces mots de passe dans Paramètres → Utilisateurs avant une utilisation réelle.
-        </div>
+       
       </div>
     </div>
   </div>`;
@@ -1312,7 +1330,6 @@ function settingsData(){
       <div class="data-actions">
         <button class="btn" data-action="export-data">${icon('download')} Exporter (JSON)</button>
         <button class="btn" data-action="import-data">${icon('upload')} Importer un fichier</button>
-        <button class="btn btn-danger" data-action="reset-data">${icon('refresh')} Réinitialiser aux valeurs de démonstration</button>
       </div>
       <input type="file" id="import-file-input" accept="application/json" style="display:none;">
     </div>
