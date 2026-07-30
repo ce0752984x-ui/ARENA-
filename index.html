@@ -8,7 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <style>
-        /* Styles identiques à la version précédente (copie intégrale) */
+        /* ---- Styles complets (identiques aux précédents, avec ajout pour les messages toast) ---- */
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Segoe UI',sans-serif; background:#f4f6fa; color:#1a2634; min-height:100vh; display:flex; justify-content:center; align-items:center; transition:background .2s; }
         body.dark { background:#1a1f2b; color:#e8edf4; }
@@ -50,6 +50,12 @@
         .success-msg { color:#1d7a4a; font-size:.9rem; margin-top:.5rem; text-align:center; }
         body.dark .error-msg { color:#f28b82; }
         body.dark .success-msg { color:#81c995; }
+        #toast-container { position:fixed; top:20px; right:20px; z-index:10000; max-width:400px; }
+        .toast { padding:12px 20px; margin-bottom:10px; border-radius:8px; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transform:translateX(120%); transition:transform .3s ease; opacity:0; }
+        .toast.show { transform:translateX(0); opacity:1; }
+        .toast.success { background:#1d7a4a; }
+        .toast.error { background:#c72a3a; }
+        .toast.info { background:#2d5f9e; }
         #banner { display:none; padding:.9rem 2rem; background:#f9e9b0; color:#3d2e00; font-size:.95rem; font-weight:500; border-bottom:2px solid rgba(0,0,0,0.04); align-items:center; gap:.8rem; flex-shrink:0; position:relative; }
         #banner.active { display:flex; }
         #banner .banner-icon { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:rgba(0,0,0,0.10); font-weight:700; font-size:1rem; flex-shrink:0; color:inherit; }
@@ -212,6 +218,9 @@
         <button class="banner-close" id="bannerClose">✕</button>
     </div>
 
+    <!-- Conteneur pour les messages toast -->
+    <div id="toast-container"></div>
+
     <div id="loginScreen" class="screen-overlay">
         <div class="login-card">
             <h1>ARENA</h1>
@@ -308,7 +317,7 @@
     }
 
     // ============================================================
-    //  DATA LAYER
+    //  DATA LAYER (CORRIGÉ : capacite = null pour illimité)
     // ============================================================
     let db = null;
     let dbLoaded = false;
@@ -367,6 +376,8 @@
             if (!Array.isArray(f.inscrits)) f.inscrits = [];
             if (!Array.isArray(f.waitlist)) f.waitlist = [];
             if (!Array.isArray(f.evaluations)) f.evaluations = [];
+            // CORRECTION : remplacer Infinity par null pour la capacité
+            if (f.capacite === Infinity || f.capacite === 'Infinity') f.capacite = null;
             return f;
         }).filter(f => f !== null);
         db.users = db.users.map(u => {
@@ -436,14 +447,17 @@
         try { localStorage.setItem('arena_data', JSON.stringify(data)); } catch(e) {}
     }
 
-    // ---------- Sauvegarde avec rafraîchissement du currentUser ----------
+    // ---------- Sauvegarde avec mise à jour de la session ----------
     function saveDB(data) {
         db = sanitizeDB(data);
         saveToLocalStorage(db);
         if (firebaseConnected && firebaseRef) {
-            firebaseRef.set(db).catch(() => {});
+            firebaseRef.set(db).catch((err) => {
+                console.error('Firebase save error:', err);
+                showToast('Erreur de sauvegarde Firebase, mais données sauvegardées localement.', 'error');
+            });
         }
-        // Rafraîchir l'utilisateur courant après toute modification
+        // Rafraîchir l'utilisateur courant
         refreshCurrentUser();
     }
 
@@ -466,6 +480,23 @@
         document.getElementById('loginPassword').value = '';
         document.getElementById('loginId').value = '';
         document.getElementById('loginError').textContent = '';
+        showToast('Vous avez été déconnecté.', 'info');
+    }
+
+    // ---------- Système de messages toast ----------
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        // Déclencher l'animation
+        setTimeout(() => toast.classList.add('show'), 50);
+        // Disparaître après 4 secondes
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
     }
 
     // ---------- Chargement depuis Firebase ----------
@@ -479,9 +510,9 @@
                 dbLoaded = true;
                 refreshCurrentUser();
                 checkAdminAndStart();
-                // Re-rendre si déjà connecté
                 if (currentUser) {
                     renderApp();
+                    showToast('Données synchronisées avec Firebase.', 'success');
                 }
             } else {
                 const local = localStorage.getItem('arena_data');
@@ -503,6 +534,7 @@
             document.getElementById('firebaseStatus').textContent = '⚠️ Firebase erreur (fallback local)';
             document.getElementById('firebaseStatus').className = 'offline';
             initFromLocalStorage();
+            showToast('Erreur de connexion Firebase. Utilisation des données locales.', 'error');
         });
     }
 
@@ -543,7 +575,12 @@
     }
     function formatDate(d) { if (!d) return ''; const parts = d.split('-'); if (parts.length===3) return parts[2]+'/'+parts[1]+'/'+parts[0]; return d; }
     function todayStr() { return new Date().toISOString().slice(0,10); }
-    function isRegistrationOpen(f) { if (!f || !f.dateDebutInscription || !f.dateFinInscription) return false; return f.dateDebutInscription <= todayStr() && f.dateFinInscription >= todayStr(); }
+    function isRegistrationOpen(f) {
+        if (!f || !f.dateDebutInscription || !f.dateFinInscription) return false;
+        // Si la formation est manuellement fermée, on retourne false
+        if (f.manuallyClosed) return false;
+        return f.dateDebutInscription <= todayStr() && f.dateFinInscription >= todayStr();
+    }
     function userIsRegistered(db, userId, fid) {
         const f = findFormation(db, fid);
         if (!f || !Array.isArray(f.inscrits)) return false;
@@ -607,7 +644,18 @@
         }
         saveDB(db);
         addLog(db, userId, 'annulation', `Annulation inscription formation ${f.id}`);
+        showToast('Inscription annulée avec succès.', 'success');
         return true;
+    }
+
+    // Clôture manuelle des inscriptions
+    function toggleManualClose(fid) {
+        const f = findFormation(db, fid);
+        if (!f) return;
+        f.manuallyClosed = !f.manuallyClosed;
+        saveDB(db);
+        showToast(f.manuallyClosed ? 'Inscriptions fermées manuellement.' : 'Inscriptions rouvertes.', 'success');
+        renderApp();
     }
 
     // ============================================================
@@ -639,6 +687,7 @@
         addLog(db, user.id, 'connexion', 'Connexion réussie');
         checkReminders();
         console.log('✅ Connexion réussie pour', id);
+        showToast(`Bienvenue ${user.prenom} ${user.nom} !`, 'success');
         return { ok: true };
     }
 
@@ -666,7 +715,7 @@
     }
 
     // ============================================================
-    //  RENDER FUNCTIONS (identiques à la version précédente)
+    //  RENDER FUNCTIONS
     // ============================================================
     function renderApp() {
         if (!currentUser || !db) return;
@@ -714,7 +763,7 @@
 
     function toggleNotifications() {
         const notifs = (db.notifications || []).filter(n => n && n.userId === currentUser.id);
-        if (notifs.length === 0) { alert('Aucune notification.'); return; }
+        if (notifs.length === 0) { showToast('Aucune notification.', 'info'); return; }
         let msg = '📬 Notifications :\n\n';
         notifs.forEach(n => {
             msg += (n.read ? '✓ ' : '⬜ ') + n.message + ' (' + new Date(n.timestamp).toLocaleString() + ')\n';
@@ -724,6 +773,7 @@
             db.notifications.forEach(n => { if (n && n.userId === currentUser.id) n.read = true; });
             saveDB(db);
             updateNotificationBadge();
+            showToast('Notifications marquées comme lues.', 'success');
         }
     }
 
@@ -790,7 +840,7 @@
         container.innerHTML = html;
     }
 
-    // ---- PAGE FORMATIONS ----
+    // ---- PAGE FORMATIONS (avec gestion de capacité null) ----
     function renderFormations(container) {
         const isAdmin = currentUser.role === 'admin';
         let formations = Array.isArray(db.formations) ? db.formations.slice() : [];
@@ -822,10 +872,12 @@
                 const registered = userIsRegistered(db, currentUser.id, f.id);
                 const inWaitlist = userInWaitlist(db, currentUser.id, f.id);
                 const inscritsCount = Array.isArray(f.inscrits) ? f.inscrits.length : 0;
-                const capacity = f.capacite || Infinity;
-                const isFull = inscritsCount >= capacity;
+                const capacity = f.capacite; // peut être null ou nombre
+                const isFull = (capacity !== null && capacity !== undefined && inscritsCount >= capacity);
                 const canRegister = open && !registered && !inWaitlist && !isFull;
                 const showWaitlist = open && !registered && isFull;
+                const capacityDisplay = (capacity === null || capacity === undefined) ? '∞' : capacity;
+
                 let evalHtml = '';
                 if (f.dateFormation < todayStr() && registered) {
                     const existing = (Array.isArray(f.evaluations) ? f.evaluations : []).find(e => e && e.userId === currentUser.id);
@@ -847,7 +899,8 @@
                         <strong>Lieu :</strong> ${f.lieu||'—'}<br/>
                         <strong>Date :</strong> ${formatDate(f.dateFormation)}<br/>
                         <strong>Inscriptions :</strong> ${formatDate(f.dateDebutInscription)} → ${formatDate(f.dateFinInscription)}<br/>
-                        <strong>Places :</strong> ${inscritsCount}${capacity !== Infinity ? '/'+capacity : ''} ${isFull ? '⚠️ Complet' : ''}
+                        <strong>Places :</strong> ${inscritsCount}${capacity !== null && capacity !== undefined ? '/'+capacity : ' (illimité)'} ${isFull ? '⚠️ Complet' : ''}
+                        ${f.manuallyClosed ? ' 🔒 Fermé' : ''}
                     </div>
                     <div class="desc">${f.description||'Aucune description.'}</div>
                     <div class="card-actions">
@@ -862,6 +915,9 @@
                         ` : `
                             <span class="inscrit-badge">${inscritsCount} inscrit·e${inscritsCount>1?'s':''}</span>
                             ${(Array.isArray(f.waitlist) && f.waitlist.length > 0) ? `<span class="waiting-badge">${f.waitlist.length} en attente</span>` : ''}
+                            <button class="btn-secondary" data-action="toggleClose" data-fid="${f.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">
+                                ${f.manuallyClosed ? '🔓 Rouvrir' : '🔒 Fermer'}
+                            </button>
                         `}
                         ${isAdmin ? `<button class="btn-secondary" data-action="viewRegistrants" data-fid="${f.id}">Voir les inscrits</button>` : ''}
                         ${isAdmin ? `<button class="btn-secondary" data-action="exportRegistrants" data-fid="${f.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">📤 CSV</button>` : ''}
@@ -898,12 +954,16 @@
                 const fid = parseInt(btn.dataset.fid);
                 if (confirm('Annuler votre inscription ?')) {
                     if (cancelInscription(currentUser.id, fid)) {
-                        alert('Inscription annulée.');
                         renderApp();
                     } else {
-                        alert('Erreur lors de l\'annulation.');
+                        showToast('Erreur lors de l\'annulation.', 'error');
                     }
                 }
+            });
+        });
+        container.querySelectorAll('[data-action="toggleClose"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                toggleManualClose(parseInt(btn.dataset.fid));
             });
         });
         container.querySelectorAll('[data-action="viewRegistrants"]').forEach(btn => {
@@ -922,7 +982,7 @@
                 const stars = btn.closest('.formation-card').querySelectorAll('.star.active');
                 const note = stars.length;
                 const comment = document.getElementById('evalComment-'+fid)?.value || '';
-                if (note === 0) { alert('Veuillez sélectionner une note.'); return; }
+                if (note === 0) { showToast('Veuillez sélectionner une note.', 'error'); return; }
                 submitEvaluation(fid, note, comment);
             });
         });
@@ -942,43 +1002,44 @@
         const f = findFormation(db, fid);
         if (!f) return;
         if (userIsRegistered(db, currentUser.id, fid) || userInWaitlist(db, currentUser.id, fid)) {
-            alert('Vous êtes déjà inscrit ou en liste d\'attente.');
+            showToast('Vous êtes déjà inscrit ou en liste d\'attente.', 'info');
             return;
         }
-        if (!isRegistrationOpen(f)) { alert('Les inscriptions sont fermées.'); return; }
-        const capacity = f.capacite || Infinity;
+        if (!isRegistrationOpen(f)) { showToast('Les inscriptions sont fermées.', 'error'); return; }
+        const capacity = f.capacite; // peut être null
         const inscrits = Array.isArray(f.inscrits) ? f.inscrits : [];
-        if (inscrits.length < capacity) {
+        if (capacity === null || capacity === undefined || inscrits.length < capacity) {
             if (!Array.isArray(f.inscrits)) f.inscrits = [];
             f.inscrits.push(currentUser.id);
             addNotification(db, currentUser.id, `Vous êtes inscrit à la formation "${f.nom} ${f.prenom}".`);
             addLog(db, currentUser.id, 'inscription', `Inscription à la formation ${f.id}`);
+            showToast('Inscription réussie !', 'success');
         } else {
             if (!Array.isArray(f.waitlist)) f.waitlist = [];
             f.waitlist.push(currentUser.id);
             addNotification(db, currentUser.id, `Vous êtes en liste d'attente pour "${f.nom} ${f.prenom}".`);
+            showToast('Places complètes. Vous êtes en liste d\'attente.', 'info');
         }
         saveDB(db);
         renderApp();
-        alert('Inscription prise en compte !');
     }
 
     function submitEvaluation(fid, note, comment) {
         const f = findFormation(db, fid);
         if (!f) return;
         if (!Array.isArray(f.evaluations)) f.evaluations = [];
-        if (f.evaluations.find(e => e && e.userId === currentUser.id)) { alert('Vous avez déjà évalué.'); return; }
+        if (f.evaluations.find(e => e && e.userId === currentUser.id)) { showToast('Vous avez déjà évalué.', 'info'); return; }
         f.evaluations.push({ userId: currentUser.id, note, comment: comment||'', timestamp: new Date().toISOString() });
         saveDB(db);
         renderApp();
-        alert('Merci pour votre évaluation !');
+        showToast('Merci pour votre évaluation !', 'success');
     }
 
     function exportRegistrants(fid) {
         const f = findFormation(db, fid);
         if (!f) return;
         const inscrits = (Array.isArray(f.inscrits) ? f.inscrits : []).map(id => getUserName(db, id));
-        if (inscrits.length === 0) { alert('Aucun inscrit.'); return; }
+        if (inscrits.length === 0) { showToast('Aucun inscrit.', 'info'); return; }
         let csv = 'Nom,Prénom\n';
         inscrits.forEach(name => {
             const parts = name.split(' ');
@@ -992,6 +1053,7 @@
         link.download = `inscrits_formation_${f.id}.csv`;
         link.click();
         URL.revokeObjectURL(link.href);
+        showToast('Export CSV effectué.', 'success');
     }
 
     // ---- PAGE MON COMPTE ----
@@ -1080,11 +1142,13 @@
             if (updateUserProfile(currentUser.id, nom, prenom, currentUser.role)) {
                 document.getElementById('editProfileMsg').textContent = 'Profil mis à jour !';
                 document.getElementById('editProfileMsg').className = 'success-msg';
+                showToast('Profil mis à jour avec succès.', 'success');
                 refreshCurrentUser();
                 renderApp();
             } else {
                 document.getElementById('editProfileMsg').textContent = 'Erreur lors de la mise à jour.';
                 document.getElementById('editProfileMsg').className = 'error-msg';
+                showToast('Erreur lors de la mise à jour.', 'error');
             }
         });
 
@@ -1099,11 +1163,13 @@
             if (p1 !== p2) { err.textContent = 'Les mots de passe ne correspondent pas.'; return; }
             if (changePassword(currentUser.id, p1, false)) {
                 succ.textContent = 'Mot de passe modifié !';
+                showToast('Mot de passe modifié avec succès.', 'success');
                 document.getElementById('cpNew').value = '';
                 document.getElementById('cpConfirm').value = '';
                 refreshCurrentUser();
                 renderApp();
-            } else { err.textContent = 'Erreur.'; }
+            } else { err.textContent = 'Erreur.';
+                showToast('Erreur lors du changement.', 'error'); }
         });
 
         document.getElementById('prefForm').addEventListener('submit', (e) => {
@@ -1114,6 +1180,7 @@
             const u = findUser(db, currentUser.id);
             if (u) { u.preferences = currentUser.preferences; saveDB(db); }
             document.getElementById('prefMsg').textContent = 'Préférences enregistrées !';
+            showToast('Préférences enregistrées.', 'success');
             applyTheme();
             setTimeout(() => { document.getElementById('prefMsg').textContent = ''; }, 3000);
         });
@@ -1140,7 +1207,7 @@
             addNotification(db, 'admin', `Nouveau ticket de ${currentUser.id}: ${sujet}`);
             saveDB(db);
             renderApp();
-            alert('Ticket créé !');
+            showToast('Ticket créé avec succès.', 'success');
         });
     }
 
@@ -1219,7 +1286,7 @@
         <div style="margin-top:2rem;"><button class="btn-secondary" id="exportStatsBtn">📤 Exporter les statistiques (CSV)</button></div>`;
     }
 
-    // ---- ADMIN FORMATIONS ----
+    // ---- ADMIN FORMATIONS (avec gestion capacité null) ----
     function renderAdminFormations() {
         let html = `<div style="margin-bottom:1.5rem;display:flex;flex-wrap:wrap;gap:0.8rem;">
             <button class="btn-primary" id="showCreateFormation" style="width:auto;padding:0.5rem 1.6rem;">+ Nouvelle formation</button>
@@ -1252,7 +1319,7 @@
         } else {
             formations.forEach(f => {
                 const count = Array.isArray(f.inscrits) ? f.inscrits.length : 0;
-                const cap = f.capacite || '∞';
+                const cap = (f.capacite === null || f.capacite === undefined) ? '∞' : f.capacite;
                 html += `<tr><td>${f.prenom} ${f.nom}</td><td>${f.type||'—'}</td><td>${formatDate(f.dateFormation)}</td><td>${count}</td><td>${cap}</td>
                     <td><div class="actions-cell">
                         <button class="btn-secondary" data-action="editFormation" data-fid="${f.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Modifier</button>
@@ -1286,7 +1353,9 @@
                 const dateFormation = document.getElementById('fDateFormation').value;
                 const lieu = document.getElementById('fLieu').value.trim();
                 const description = document.getElementById('fDescription').value.trim();
-                const capacite = parseInt(document.getElementById('fCapacite').value) || Infinity;
+                let capacite = parseInt(document.getElementById('fCapacite').value);
+                if (isNaN(capacite) || capacite < 1) capacite = null; // null = illimité
+
                 if (!nom || !prenom || !dateDebut || !dateFin || !dateFormation) {
                     document.getElementById('createFormationMsg').textContent = 'Tous les champs obligatoires doivent être remplis.';
                     document.getElementById('createFormationMsg').className = 'error-msg';
@@ -1308,7 +1377,7 @@
                     dateFormation,
                     lieu: lieu || '—',
                     description: description || '',
-                    capacite: capacite,
+                    capacite: capacite, // null ou nombre
                     inscrits: [],
                     waitlist: [],
                     evaluations: []
@@ -1318,6 +1387,7 @@
                 saveDB(db);
                 document.getElementById('createFormationMsg').textContent = 'Formation créée avec succès !';
                 document.getElementById('createFormationMsg').className = 'success-msg';
+                showToast('Formation créée avec succès.', 'success');
                 createForm.reset();
                 setTimeout(() => { formDiv.style.display = 'none'; renderApp(); }, 600);
             });
@@ -1329,6 +1399,7 @@
                     if (Array.isArray(db.formations)) db.formations = db.formations.filter(f => f.id !== fid);
                     saveDB(db);
                     renderApp();
+                    showToast('Formation supprimée.', 'success');
                 }
             });
         });
@@ -1350,9 +1421,11 @@
                 f.type = newType.trim() || f.type;
                 f.lieu = newLieu.trim() || f.lieu;
                 f.description = newDesc.trim() || f.description;
-                f.capacite = newCap.trim() ? parseInt(newCap) : Infinity;
+                let cap = parseInt(newCap.trim());
+                f.capacite = (isNaN(cap) || cap < 1) ? null : cap;
                 saveDB(db);
                 renderApp();
+                showToast('Formation modifiée.', 'success');
             });
         });
         document.getElementById('importFormationsBtn')?.addEventListener('click', () => {
@@ -1365,7 +1438,7 @@
             reader.onload = (ev) => {
                 const text = ev.target.result;
                 const lines = text.split('\n').filter(line => line.trim());
-                if (lines.length < 2) { alert('Fichier CSV invalide.'); return; }
+                if (lines.length < 2) { showToast('Fichier CSV invalide.', 'error'); return; }
                 const header = lines[0].split(',').map(h => h.trim().toLowerCase());
                 const nomIdx = header.indexOf('nom');
                 const prenomIdx = header.indexOf('prenom');
@@ -1377,7 +1450,7 @@
                 const descIdx = header.indexOf('description');
                 const capIdx = header.indexOf('capacite');
                 if (nomIdx === -1 || prenomIdx === -1 || dateDebutIdx === -1 || dateFinIdx === -1 || dateFormationIdx === -1) {
-                    alert('Colonnes requises : nom, prenom, dateDebutInscription, dateFinInscription, dateFormation');
+                    showToast('Colonnes requises : nom, prenom, dateDebutInscription, dateFinInscription, dateFormation', 'error');
                     return;
                 }
                 let created = 0;
@@ -1392,7 +1465,8 @@
                     const dateFormation = cols[dateFormationIdx] || '';
                     const lieu = (lieuIdx>=0 && cols[lieuIdx]) || '—';
                     const description = (descIdx>=0 && cols[descIdx]) || '';
-                    const capacite = (capIdx>=0 && cols[capIdx]) ? parseInt(cols[capIdx]) : Infinity;
+                    let capacite = (capIdx>=0 && cols[capIdx]) ? parseInt(cols[capIdx]) : null;
+                    if (isNaN(capacite) || capacite < 1) capacite = null;
                     if (!nom || !prenom || !dateDebut || !dateFin || !dateFormation) continue;
                     if (!db.nextId) db.nextId = { formation:1, ticket:1, announcement:1, faq:1, log:1 };
                     if (typeof db.nextId.formation !== 'number' || isNaN(db.nextId.formation)) db.nextId.formation = 1;
@@ -1403,13 +1477,13 @@
                         dateFinInscription: dateFin,
                         dateFormation,
                         lieu, description,
-                        capacite,
+                        capacite: capacite,
                         inscrits: [], waitlist: [], evaluations: []
                     });
                     created++;
                 }
                 saveDB(db);
-                alert(`${created} formation(s) importée(s).`);
+                showToast(`${created} formation(s) importée(s).`, 'success');
                 file.value = '';
                 renderApp();
             };
@@ -1417,7 +1491,7 @@
         });
         document.getElementById('exportAllFormationsBtn')?.addEventListener('click', () => {
             const formations = Array.isArray(db.formations) ? db.formations : [];
-            if (formations.length === 0) { alert('Aucune formation.'); return; }
+            if (formations.length === 0) { showToast('Aucune formation.', 'info'); return; }
             let csv = 'nom,prenom,type,dateDebutInscription,dateFinInscription,dateFormation,lieu,description,capacite,inscrits\n';
             formations.forEach(f => {
                 const inscrits = (Array.isArray(f.inscrits) ? f.inscrits : []).join(';');
@@ -1429,6 +1503,7 @@
             link.download = 'formations_complet.csv';
             link.click();
             URL.revokeObjectURL(link.href);
+            showToast('Export CSV effectué.', 'success');
         });
         document.getElementById('archiveToggleBtn')?.addEventListener('click', () => {
             sessionStorage.setItem('showArchives', String(!(sessionStorage.getItem('showArchives')==='true')));
@@ -1436,7 +1511,7 @@
         });
     }
 
-    // ---- ADMIN COMPTES ----
+    // ---- ADMIN COMPTES (avec rôle admin) ----
     function renderAdminComptes() {
         let html = `<div style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
             <button class="btn-primary" id="showCreateUser" style="width:auto;padding:0.5rem 1.6rem;">+ Créer un compte</button>
@@ -1526,6 +1601,7 @@
                 saveDB(db);
                 document.getElementById('createUserMsg').textContent = `Compte créé : ID = ${id}, mot de passe = ${pwd} (à modifier lors du premier accès)`;
                 document.getElementById('createUserMsg').className = 'success-msg';
+                showToast(`Compte créé avec succès. ID: ${id}, MDP: ${pwd}`, 'success');
                 createForm.reset();
                 setTimeout(() => { formDiv.style.display = 'none'; renderApp(); }, 1200);
             });
@@ -1551,9 +1627,9 @@
                         refreshCurrentUser();
                     }
                     renderApp();
-                    alert('Profil mis à jour.');
+                    showToast('Profil mis à jour.', 'success');
                 } else {
-                    alert('Erreur lors de la mise à jour.');
+                    showToast('Erreur lors de la mise à jour.', 'error');
                 }
             });
         });
@@ -1568,21 +1644,21 @@
                     newPwd = generatePassword();
                 } else {
                     newPwd = prompt('Nouveau mot de passe (min 4 caractères) :');
-                    if (!newPwd || newPwd.length < 4) { alert('Mot de passe invalide.'); return; }
+                    if (!newPwd || newPwd.length < 4) { showToast('Mot de passe invalide.', 'error'); return; }
                 }
                 if (changePassword(uid, newPwd, true)) {
                     addLog(db, currentUser.id, 'change_password', `Mot de passe modifié pour ${uid}`);
                     addNotification(db, uid, `Votre mot de passe a été réinitialisé par l'administrateur. Connectez-vous avec le nouveau mot de passe.`);
-                    alert(`Mot de passe modifié. Nouveau mot de passe : ${newPwd}`);
+                    showToast(`Mot de passe modifié. Nouveau mot de passe : ${newPwd}`, 'success');
                     if (uid === currentUser.id) refreshCurrentUser();
                     renderApp();
-                } else { alert('Erreur.'); }
+                } else { showToast('Erreur.', 'error'); }
             });
         });
         document.querySelectorAll('[data-action="deleteUser"]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const uid = btn.dataset.uid;
-                if (uid === 'admin') { alert('Le compte admin ne peut pas être supprimé.'); return; }
+                if (uid === 'admin') { showToast('Le compte admin ne peut pas être supprimé.', 'error'); return; }
                 if (confirm(`Supprimer l'utilisateur ${uid} ?`)) {
                     if (Array.isArray(db.users)) db.users = db.users.filter(u => u.id !== uid);
                     if (Array.isArray(db.formations)) {
@@ -1594,13 +1670,14 @@
                     saveDB(db);
                     if (uid === currentUser.id) logout();
                     else renderApp();
+                    showToast('Utilisateur supprimé.', 'success');
                 }
             });
         });
         document.getElementById('exportUsersBtn')?.addEventListener('click', () => {
             const users = Array.isArray(db.users) ? db.users : [];
             const nonAdmin = users.filter(u => u.role !== 'admin');
-            if (nonAdmin.length === 0) { alert('Aucun utilisateur non-admin à exporter.'); return; }
+            if (nonAdmin.length === 0) { showToast('Aucun utilisateur non-admin à exporter.', 'info'); return; }
             let csv = 'nom,prenom,role\n';
             nonAdmin.forEach(u => { csv += `${u.nom},${u.prenom},${u.role}\n`; });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1609,6 +1686,7 @@
             link.download = 'utilisateurs_arena.csv';
             link.click();
             URL.revokeObjectURL(link.href);
+            showToast('Export CSV effectué.', 'success');
         });
         document.getElementById('importUsersBtn')?.addEventListener('click', () => {
             document.getElementById('csvUserInput').click();
@@ -1620,13 +1698,13 @@
             reader.onload = (ev) => {
                 const text = ev.target.result;
                 const lines = text.split('\n').filter(line => line.trim());
-                if (lines.length < 2) { alert('Fichier CSV invalide.'); return; }
+                if (lines.length < 2) { showToast('Fichier CSV invalide.', 'error'); return; }
                 const header = lines[0].split(',').map(h => h.trim().toLowerCase());
                 const nomIdx = header.indexOf('nom');
                 const prenomIdx = header.indexOf('prenom');
                 const roleIdx = header.indexOf('role');
                 if (nomIdx === -1 || prenomIdx === -1 || roleIdx === -1) {
-                    alert('Le CSV doit contenir les colonnes : nom, prenom, role');
+                    showToast('Le CSV doit contenir les colonnes : nom, prenom, role', 'error');
                     return;
                 }
                 let created = 0, skipped = 0;
@@ -1655,7 +1733,7 @@
                     created++;
                 }
                 saveDB(db);
-                alert(`Import terminé : ${created} compte(s) créé(s), ${skipped} ignoré(s) (existants).`);
+                showToast(`Import terminé : ${created} compte(s) créé(s), ${skipped} ignoré(s) (existants).`, 'success');
                 file.value = '';
                 renderApp();
             };
@@ -1663,7 +1741,7 @@
         });
     }
 
-    // ---- ADMIN ANNONCES ----
+    // ---- ADMIN ANNONCES (identique) ----
     function renderAdminAnnonces() {
         let html = `<div style="margin-bottom:1rem;"><button class="btn-primary" id="showCreateAnnonce" style="width:auto;padding:0.5rem 1.6rem;">+ Nouvelle annonce</button></div>
         <div id="createAnnonceForm" style="display:none;background:#f8faff;padding:1.5rem;border-radius:16px;border:1px solid #e9eef4;margin-bottom:2rem;">
@@ -1721,7 +1799,7 @@
                 });
                 saveDB(db);
                 document.getElementById('createAnnonceMsg').textContent = 'Annonce publiée !';
-                document.getElementById('createAnnonceMsg').className = 'success-msg';
+                showToast('Annonce publiée.', 'success');
                 createForm.reset();
                 setTimeout(() => { formDiv.style.display = 'none'; renderApp(); }, 500);
             });
@@ -1733,12 +1811,13 @@
                     if (Array.isArray(db.announcements)) db.announcements = db.announcements.filter(a => a.id !== aid);
                     saveDB(db);
                     renderApp();
+                    showToast('Annonce supprimée.', 'success');
                 }
             });
         });
     }
 
-    // ---- ADMIN FAQ ----
+    // ---- ADMIN FAQ (identique) ----
     function renderAdminFAQ() {
         let html = `<div style="margin-bottom:1rem;"><button class="btn-primary" id="showCreateFaq" style="width:auto;padding:0.5rem 1.6rem;">+ Nouvelle FAQ</button></div>
         <div id="createFaqForm" style="display:none;background:#f8faff;padding:1.5rem;border-radius:16px;border:1px solid #e9eef4;margin-bottom:2rem;">
@@ -1790,7 +1869,7 @@
                 db.faqs.push({ id: Date.now()+Math.random(), question, reponse });
                 saveDB(db);
                 document.getElementById('createFaqMsg').textContent = 'FAQ ajoutée !';
-                document.getElementById('createFaqMsg').className = 'success-msg';
+                showToast('FAQ ajoutée.', 'success');
                 createForm.reset();
                 setTimeout(() => { formDiv.style.display = 'none'; renderApp(); }, 500);
             });
@@ -1802,6 +1881,7 @@
                     if (Array.isArray(db.faqs)) db.faqs = db.faqs.filter(f => f.id !== fid);
                     saveDB(db);
                     renderApp();
+                    showToast('FAQ supprimée.', 'success');
                 }
             });
         });
@@ -1836,13 +1916,14 @@
                 if (!ticket) return;
                 const reponse = prompt('Votre réponse :');
                 if (reponse === null) return;
-                if (!reponse.trim()) { alert('Réponse vide.'); return; }
+                if (!reponse.trim()) { showToast('Réponse vide.', 'error'); return; }
                 ticket.reponse = reponse.trim();
                 ticket.status = 'résolu';
                 saveDB(db);
                 addNotification(db, ticket.userId, `Réponse à votre ticket "${ticket.sujet}" : ${reponse.trim()}`);
                 addLog(db, currentUser.id, 'ticket_repondu', `Ticket #${tid}`);
                 renderApp();
+                showToast('Réponse envoyée.', 'success');
             });
         });
         document.querySelectorAll('[data-action="changerStatutTicket"]').forEach(btn => {
@@ -1853,10 +1934,11 @@
                 const newStatus = prompt('Nouveau statut (ouvert, en cours, résolu, fermé) :', ticket.status);
                 if (!newStatus) return;
                 const valid = ['ouvert','en cours','résolu','fermé'];
-                if (!valid.includes(newStatus.toLowerCase())) { alert('Statut invalide.'); return; }
+                if (!valid.includes(newStatus.toLowerCase())) { showToast('Statut invalide.', 'error'); return; }
                 ticket.status = newStatus.toLowerCase();
                 saveDB(db);
                 renderApp();
+                showToast('Statut mis à jour.', 'success');
             });
         });
     }
@@ -1893,6 +1975,7 @@
             db.banner = { text: text || 'Message d\'information', color, active };
             saveDB(db);
             document.getElementById('bannerFormMsg').textContent = 'Bandeau mis à jour !';
+            showToast('Bandeau mis à jour.', 'success');
             setTimeout(() => { document.getElementById('bannerFormMsg').textContent = ''; }, 3000);
             renderBanner();
             renderApp();
@@ -1956,6 +2039,7 @@
                 db.settings.lockDuration = lockDuration;
                 saveDB(db);
                 document.getElementById('settingsMsg').textContent = 'Paramètres enregistrés !';
+                showToast('Paramètres enregistrés.', 'success');
                 applyTheme();
                 setTimeout(() => { document.getElementById('settingsMsg').textContent = ''; }, 3000);
             });
@@ -1969,7 +2053,7 @@
                 db.logs = [];
                 saveDB(db);
                 renderApp();
-                alert('Logs effacés.');
+                showToast('Logs effacés.', 'success');
             }
         });
         document.getElementById('exportFullBtn')?.addEventListener('click', () => {
@@ -1980,6 +2064,7 @@
             link.download = 'arena_backup.json';
             link.click();
             URL.revokeObjectURL(link.href);
+            showToast('Export JSON effectué.', 'success');
         });
         document.getElementById('importFullBtn')?.addEventListener('click', () => {
             document.getElementById('jsonImportInput').click();
@@ -1993,15 +2078,15 @@
                     const imported = JSON.parse(ev.target.result);
                     if (confirm('Remplacer toutes les données actuelles ?')) {
                         const admin = imported.users.find(u => u.id === 'admin');
-                        if (!admin) { alert('Le fichier importé ne contient pas de compte admin.'); return; }
+                        if (!admin) { showToast('Le fichier importé ne contient pas de compte admin.', 'error'); return; }
                         db = imported;
                         db = sanitizeDB(db);
                         saveDB(db);
                         refreshCurrentUser();
                         renderApp();
-                        alert('Données importées avec succès !');
+                        showToast('Données importées avec succès !', 'success');
                     }
-                } catch(err) { alert('Fichier JSON invalide.'); }
+                } catch(err) { showToast('Fichier JSON invalide.', 'error'); }
             };
             reader.readAsText(file);
         });
@@ -2014,7 +2099,7 @@
                 refreshCurrentUser();
                 renderApp();
                 document.getElementById('resetMsg').textContent = '✅ Base réinitialisée avec succès !';
-                document.getElementById('resetMsg').className = 'success-msg';
+                showToast('Base réinitialisée.', 'success');
                 setTimeout(() => { document.getElementById('resetMsg').textContent = ''; }, 3000);
             }
         });
@@ -2096,6 +2181,7 @@
             currentUser = findUser(db, currentUser.id);
             document.getElementById('firstLoginScreen').style.display = 'none';
             enterApp();
+            showToast('Mot de passe personnalisé avec succès.', 'success');
         } else {
             errEl.textContent = 'Erreur lors de l\'enregistrement.';
         }
@@ -2117,6 +2203,7 @@
             db.banner.active = false;
             saveDB(db);
             renderBanner();
+            showToast('Bandeau désactivé.', 'info');
         }
     });
 </script>
