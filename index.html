@@ -1,1 +1,2108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARENA – Portail Formation</title>
+    <!-- Favicon (emoji "A" en SVG) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>" />
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        /* --- Styles complets (optimisés) --- */
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Segoe UI',sans-serif; background:#f4f6fa; color:#1a2634; min-height:100vh; display:flex; justify-content:center; align-items:center; transition:background .2s; }
+        body.dark { background:#1a1f2b; color:#e8edf4; }
+        button { cursor:pointer; font-family:inherit; }
+        input, textarea, select { font-family:inherit; }
+        #app { width:100%; max-width:1400px; min-height:100vh; background:#fff; box-shadow:0 0 40px rgba(0,0,0,0.06); display:flex; flex-direction:column; margin:0 auto; position:relative; transition:background .2s; }
+        body.dark #app { background:#232837; }
+        .screen-overlay { flex:1; display:flex; justify-content:center; align-items:center; padding:2rem; background:linear-gradient(145deg,#f0f4fe,#e6edfc); min-height:100vh; }
+        body.dark .screen-overlay { background:#1a1f2b; }
+        .login-card, .first-login-card { background:#fff; padding:2.8rem 3rem; border-radius:28px; box-shadow:0 20px 60px rgba(26,38,52,0.12); width:100%; max-width:440px; }
+        body.dark .login-card, body.dark .first-login-card { background:#2d3443; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+        .login-card h1, .first-login-card h1 { font-size:2rem; font-weight:700; letter-spacing:-0.5px; color:#0f1a2b; margin-bottom:.2rem; }
+        body.dark .login-card h1, body.dark .first-login-card h1 { color:#f0f4fe; }
+        .login-card .subtitle, .first-login-card .subtitle { color:#5e6f8d; font-size:.95rem; margin-bottom:2rem; }
+        body.dark .login-card .subtitle, body.dark .first-login-card .subtitle { color:#a0b3cf; }
+        .login-card label, .first-login-card label { display:block; font-weight:600; font-size:.85rem; color:#2a3a52; margin-bottom:.3rem; }
+        body.dark .login-card label, body.dark .first-login-card label { color:#c8d4e8; }
+        .login-card input, .first-login-card input { width:100%; padding:.7rem 1rem; border:2px solid #dce3ed; border-radius:12px; font-size:1rem; transition:.15s; margin-bottom:1.2rem; background:#fafcff; }
+        body.dark .login-card input, body.dark .first-login-card input { background:#333b4d; border-color:#4b556b; color:#e8edf4; }
+        .login-card input:focus, .first-login-card input:focus { border-color:#2d5f9e; outline:none; background:#fff; box-shadow:0 0 0 4px rgba(45,95,158,0.10); }
+        body.dark .login-card input:focus, body.dark .first-login-card input:focus { background:#3a4459; border-color:#5b8cd9; }
+        .btn-primary { width:100%; padding:.8rem; background:#1a3a62; color:#fff; border:none; border-radius:12px; font-size:1rem; font-weight:600; transition:.15s; }
+        .btn-primary:hover { background:#0f2a47; transform:translateY(-1px); box-shadow:0 8px 20px rgba(26,58,98,0.25); }
+        body.dark .btn-primary { background:#2d5f9e; }
+        body.dark .btn-primary:hover { background:#1e4a7a; }
+        .btn-secondary { background:#eef2f8; color:#1a3a62; border:none; padding:.6rem 1.4rem; border-radius:10px; font-weight:600; font-size:.9rem; transition:.15s; }
+        .btn-secondary:hover { background:#dce3ed; }
+        body.dark .btn-secondary { background:#3a4459; color:#c8d4e8; }
+        body.dark .btn-secondary:hover { background:#4b556b; }
+        .btn-danger { background:#c72a3a; color:#fff; border:none; padding:.5rem 1.2rem; border-radius:10px; font-weight:600; font-size:.85rem; transition:.15s; }
+        .btn-danger:hover { background:#a91f2d; }
+        .btn-success { background:#1d7a4a; color:#fff; border:none; padding:.5rem 1.2rem; border-radius:10px; font-weight:600; font-size:.85rem; transition:.15s; }
+        .btn-success:hover { background:#14633b; }
+        .btn-outline { background:transparent; color:#1a3a62; border:2px solid #dce3ed; padding:.5rem 1.2rem; border-radius:10px; font-weight:600; font-size:.85rem; transition:.15s; }
+        .btn-outline:hover { background:#f0f4fe; border-color:#b0c4db; }
+        body.dark .btn-outline { color:#c8d4e8; border-color:#4b556b; }
+        body.dark .btn-outline:hover { background:#3a4459; border-color:#6b7a93; }
+        .error-msg { color:#c72a3a; font-size:.9rem; margin-top:.5rem; text-align:center; }
+        .success-msg { color:#1d7a4a; font-size:.9rem; margin-top:.5rem; text-align:center; }
+        body.dark .error-msg { color:#f28b82; }
+        body.dark .success-msg { color:#81c995; }
+        #banner { display:none; padding:.9rem 2rem; background:#f9e9b0; color:#3d2e00; font-size:.95rem; font-weight:500; border-bottom:2px solid rgba(0,0,0,0.04); align-items:center; gap:.8rem; flex-shrink:0; position:relative; }
+        #banner.active { display:flex; }
+        #banner .banner-icon { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:rgba(0,0,0,0.10); font-weight:700; font-size:1rem; flex-shrink:0; color:inherit; }
+        #banner .banner-text { flex:1; word-break:break-word; }
+        #banner .banner-close { background:none; border:none; font-size:1.3rem; color:inherit; opacity:.5; padding:0 .3rem; transition:.1s; line-height:1; }
+        #banner .banner-close:hover { opacity:.9; }
+        .top-nav { display:flex; align-items:center; justify-content:space-between; padding:.6rem 2rem; background:#fff; border-bottom:1px solid #e9eef4; flex-shrink:0; flex-wrap:wrap; gap:.5rem 1rem; }
+        body.dark .top-nav { background:#232837; border-bottom-color:#3a4459; }
+        .top-nav .brand { font-size:1.5rem; font-weight:700; letter-spacing:-0.3px; color:#0f1a2b; display:flex; align-items:center; gap:.4rem; }
+        body.dark .top-nav .brand { color:#f0f4fe; }
+        .top-nav .brand span { color:#2d5f9e; }
+        body.dark .top-nav .brand span { color:#5b8cd9; }
+        .top-nav .nav-links { display:flex; gap:.2rem; flex-wrap:wrap; }
+        .top-nav .nav-links button { background:transparent; border:none; padding:.5rem 1.2rem; border-radius:10px; font-weight:600; font-size:.9rem; color:#3d4f69; transition:.1s; }
+        body.dark .top-nav .nav-links button { color:#a0b3cf; }
+        .top-nav .nav-links button:hover { background:#f0f4fe; color:#0f1a2b; }
+        body.dark .top-nav .nav-links button:hover { background:#3a4459; color:#f0f4fe; }
+        .top-nav .nav-links button.active { background:#e6edfc; color:#1a3a62; }
+        body.dark .top-nav .nav-links button.active { background:#2d5f9e; color:#fff; }
+        .top-nav .user-area { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+        .top-nav .user-area .user-badge { font-weight:600; font-size:.9rem; color:#1a3a62; }
+        body.dark .top-nav .user-area .user-badge { color:#c8d4e8; }
+        .top-nav .user-area .user-role { font-size:.75rem; font-weight:500; color:#5e6f8d; background:#eef2f8; padding:.15rem .7rem; border-radius:20px; }
+        body.dark .top-nav .user-area .user-role { background:#3a4459; color:#a0b3cf; }
+        .top-nav .user-area .logout-btn { background:none; border:none; color:#5e6f8d; font-weight:600; font-size:.85rem; padding:.3rem .8rem; border-radius:8px; transition:.1s; }
+        body.dark .top-nav .user-area .logout-btn { color:#a0b3cf; }
+        .top-nav .user-area .logout-btn:hover { background:#f0eef2; color:#c72a3a; }
+        body.dark .top-nav .user-area .logout-btn:hover { background:#3a4459; color:#f28b82; }
+        .top-nav .notification-bell { position:relative; font-size:1.4rem; cursor:pointer; padding:.2rem .4rem; }
+        .top-nav .notification-bell .badge { position:absolute; top:-6px; right:-6px; background:#c72a3a; color:#fff; border-radius:50%; font-size:.65rem; padding:.1rem .4rem; font-weight:700; min-width:18px; text-align:center; }
+        .main-content { flex:1; padding:2rem 2rem 3rem; overflow-y:auto; background:#fafcff; }
+        body.dark .main-content { background:#1a1f2b; }
+        .page { display:none; animation:fadeIn .2s ease; }
+        .page.active { display:block; }
+        @keyframes fadeIn { 0%{opacity:0;transform:translateY(6px);} 100%{opacity:1;transform:translateY(0);} }
+        .page-title { font-size:1.6rem; font-weight:700; color:#0f1a2b; margin-bottom:1.5rem; letter-spacing:-0.3px; }
+        body.dark .page-title { color:#f0f4fe; }
+        .page-title small { font-size:.95rem; font-weight:400; color:#5e6f8d; margin-left:.5rem; }
+        body.dark .page-title small { color:#a0b3cf; }
+        .formations-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:1.5rem; }
+        .formation-card { background:#fff; border-radius:18px; padding:1.5rem 1.8rem; box-shadow:0 4px 16px rgba(0,0,0,0.04); border:1px solid #e9eef4; transition:.15s; }
+        body.dark .formation-card { background:#2d3443; border-color:#3a4459; box-shadow:0 4px 16px rgba(0,0,0,0.2); }
+        .formation-card:hover { box-shadow:0 8px 28px rgba(0,0,0,0.06); border-color:#d0dcee; }
+        body.dark .formation-card:hover { border-color:#5b6a83; }
+        .formation-card h3 { font-size:1.2rem; color:#0f1a2b; margin-bottom:.2rem; }
+        body.dark .formation-card h3 { color:#f0f4fe; }
+        .formation-card .trainer { font-size:.85rem; color:#5e6f8d; margin-bottom:.6rem; }
+        body.dark .formation-card .trainer { color:#a0b3cf; }
+        .formation-card .meta { font-size:.85rem; color:#3d4f69; line-height:1.6; margin:.6rem 0; }
+        body.dark .formation-card .meta { color:#b0c4db; }
+        .formation-card .meta strong { font-weight:600; color:#1a3a62; }
+        body.dark .formation-card .meta strong { color:#7aa3d9; }
+        .formation-card .desc { font-size:.9rem; color:#3d4f69; margin:.6rem 0 .8rem; line-height:1.5; }
+        body.dark .formation-card .desc { color:#b0c4db; }
+        .formation-card .card-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.8rem; align-items:center; }
+        .formation-card .inscrit-badge { font-size:.8rem; color:#1d7a4a; background:#e3f5ec; padding:.2rem .8rem; border-radius:20px; font-weight:600; }
+        body.dark .formation-card .inscrit-badge { background:#1d3a2a; color:#81c995; }
+        .formation-card .registrants-list { font-size:.8rem; color:#5e6f8d; margin-top:.4rem; }
+        body.dark .formation-card .registrants-list { color:#a0b3cf; }
+        .formation-card .waiting-badge { font-size:.75rem; color:#b06a1a; background:#fcedd4; padding:.2rem .8rem; border-radius:20px; font-weight:600; }
+        body.dark .formation-card .waiting-badge { background:#3d2e1a; color:#e8c28a; }
+        .formation-card .evaluation { margin-top:.8rem; border-top:1px solid #e9eef4; padding-top:.8rem; }
+        body.dark .formation-card .evaluation { border-top-color:#3a4459; }
+        .formation-card .stars { display:inline-flex; gap:.2rem; font-size:1.2rem; cursor:pointer; }
+        .formation-card .stars .star { color:#dce3ed; transition:.1s; }
+        .formation-card .stars .star.active { color:#f5b342; }
+        body.dark .formation-card .stars .star { color:#4b556b; }
+        body.dark .formation-card .stars .star.active { color:#f5b342; }
+        .console-tabs { display:flex; gap:.3rem; border-bottom:2px solid #e9eef4; margin-bottom:1.8rem; flex-wrap:wrap; overflow-x:auto; }
+        body.dark .console-tabs { border-bottom-color:#3a4459; }
+        .console-tabs button { background:transparent; border:none; padding:.7rem 1.6rem; font-weight:600; font-size:.9rem; color:#5e6f8d; border-bottom:3px solid transparent; transition:.1s; margin-bottom:-2px; white-space:nowrap; }
+        body.dark .console-tabs button { color:#a0b3cf; }
+        .console-tabs button:hover { color:#0f1a2b; background:#f0f4fe; }
+        body.dark .console-tabs button:hover { color:#f0f4fe; background:#3a4459; }
+        .console-tabs button.active { color:#1a3a62; border-bottom-color:#1a3a62; }
+        body.dark .console-tabs button.active { color:#5b8cd9; border-bottom-color:#5b8cd9; }
+        .console-panel { display:none; animation:fadeIn .2s ease; }
+        .console-panel.active { display:block; }
+        .form-group { margin-bottom:1.2rem; }
+        .form-group label { display:block; font-weight:600; font-size:.85rem; color:#2a3a52; margin-bottom:.25rem; }
+        body.dark .form-group label { color:#c8d4e8; }
+        .form-group input, .form-group textarea, .form-group select { width:100%; padding:.6rem 1rem; border:2px solid #dce3ed; border-radius:10px; font-size:.95rem; background:#fafcff; transition:.15s; }
+        body.dark .form-group input, body.dark .form-group textarea, body.dark .form-group select { background:#333b4d; border-color:#4b556b; color:#e8edf4; }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color:#2d5f9e; outline:none; background:#fff; box-shadow:0 0 0 4px rgba(45,95,158,0.08); }
+        body.dark .form-group input:focus, body.dark .form-group textarea:focus, body.dark .form-group select:focus { background:#3a4459; border-color:#5b8cd9; }
+        .form-group textarea { min-height:70px; resize:vertical; }
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+        .table-wrap { overflow-x:auto; margin:1.2rem 0; border-radius:12px; border:1px solid #e9eef4; }
+        body.dark .table-wrap { border-color:#3a4459; }
+        table { width:100%; border-collapse:collapse; font-size:.9rem; }
+        table th { background:#f0f4fe; text-align:left; padding:.7rem 1rem; font-weight:600; color:#1a3a62; border-bottom:2px solid #dce3ed; }
+        body.dark table th { background:#2d3443; color:#c8d4e8; border-bottom-color:#4b556b; }
+        table td { padding:.6rem 1rem; border-bottom:1px solid #e9eef4; color:#1a2634; }
+        body.dark table td { border-bottom-color:#3a4459; color:#d0dcee; }
+        table tr:last-child td { border-bottom:none; }
+        table .actions-cell { display:flex; gap:.4rem; flex-wrap:wrap; }
+        .badge { font-size:.7rem; font-weight:600; padding:.15rem .6rem; border-radius:20px; background:#e9eef4; color:#3d4f69; }
+        body.dark .badge { background:#3a4459; color:#b0c4db; }
+        .badge.admin { background:#dce3ed; color:#1a3a62; }
+        body.dark .badge.admin { background:#2d5f9e; color:#fff; }
+        .badge.professeur { background:#d4e2f7; color:#1a3a62; }
+        body.dark .badge.professeur { background:#1d3a5a; color:#a0c4f0; }
+        .badge.personnel { background:#e3f0f5; color:#1a3a62; }
+        body.dark .badge.personnel { background:#1d3a4a; color:#a0d0e0; }
+        .empty-state { text-align:center; padding:3rem 1rem; color:#5e6f8d; }
+        body.dark .empty-state { color:#a0b3cf; }
+        .empty-state p { font-size:1rem; }
+        .account-grid { display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
+        .account-card { background:#fff; border-radius:18px; padding:1.5rem 2rem; border:1px solid #e9eef4; box-shadow:0 4px 12px rgba(0,0,0,0.02); }
+        body.dark .account-card { background:#2d3443; border-color:#3a4459; }
+        .account-card h4 { font-size:1.1rem; color:#0f1a2b; margin-bottom:.8rem; }
+        body.dark .account-card h4 { color:#f0f4fe; }
+        .account-card .info-row { display:flex; justify-content:space-between; padding:.4rem 0; border-bottom:1px solid #f0f4fe; font-size:.9rem; }
+        body.dark .account-card .info-row { border-bottom-color:#3a4459; }
+        .account-card .info-row .label { color:#5e6f8d; font-weight:500; }
+        body.dark .account-card .info-row .label { color:#a0b3cf; }
+        .account-card .info-row .value { font-weight:500; color:#0f1a2b; }
+        body.dark .account-card .info-row .value { color:#f0f4fe; }
+        .ticket-item { padding:.8rem; border:1px solid #e9eef4; border-radius:10px; margin-bottom:.8rem; background:#fafcff; }
+        body.dark .ticket-item { border-color:#3a4459; background:#232837; }
+        .ticket-item .ticket-header { display:flex; justify-content:space-between; font-weight:600; flex-wrap:wrap; }
+        .ticket-item .ticket-status { font-size:.75rem; padding:.1rem .6rem; border-radius:20px; background:#eef2f8; color:#3d4f69; }
+        body.dark .ticket-item .ticket-status { background:#3a4459; color:#b0c4db; }
+        .ticket-item .ticket-status.open { background:#fcedd4; color:#b06a1a; }
+        .ticket-item .ticket-status.resolved { background:#d4edda; color:#1d7a4a; }
+        .ticket-item .ticket-status.closed { background:#e9eef4; color:#5e6f8d; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:1.2rem; margin-bottom:2rem; }
+        .stat-card { background:#fff; border-radius:16px; padding:1.2rem; border:1px solid #e9eef4; text-align:center; }
+        body.dark .stat-card { background:#2d3443; border-color:#3a4459; }
+        .stat-card .stat-number { font-size:2.2rem; font-weight:700; color:#1a3a62; }
+        body.dark .stat-card .stat-number { color:#5b8cd9; }
+        .stat-card .stat-label { font-size:.85rem; color:#5e6f8d; }
+        body.dark .stat-card .stat-label { color:#a0b3cf; }
+        .chart-bar { display:flex; gap:.8rem; align-items:center; margin-bottom:.4rem; }
+        .chart-bar .bar-label { width:120px; font-size:.8rem; color:#3d4f69; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        body.dark .chart-bar .bar-label { color:#b0c4db; }
+        .chart-bar .bar-track { flex:1; height:18px; background:#e9eef4; border-radius:10px; overflow:hidden; }
+        body.dark .chart-bar .bar-track { background:#3a4459; }
+        .chart-bar .bar-fill { height:100%; background:#2d5f9e; border-radius:10px; transition:width .3s; }
+        .chart-bar .bar-value { font-size:.8rem; color:#5e6f8d; min-width:30px; text-align:right; }
+        body.dark .chart-bar .bar-value { color:#a0b3cf; }
+        .flex-between { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; }
+        .mb-1 { margin-bottom:1rem; }
+        .mt-1 { margin-top:1rem; }
+        .hidden { display:none !important; }
+        #firebaseStatus { position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.7); color:#fff; padding:5px 12px; border-radius:20px; font-size:.75rem; z-index:9999; pointer-events:none; }
+        #firebaseStatus.online { background:#1d7a4a; }
+        #firebaseStatus.offline { background:#c72a3a; }
+        /* Loading spinner */
+        .spinner { display:inline-block; width:20px; height:20px; border:3px solid rgba(255,255,255,0.3); border-radius:50%; border-top-color:#fff; animation:spin .8s linear infinite; vertical-align:middle; margin-right:8px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @media (max-width:820px){ .account-grid,.form-row{grid-template-columns:1fr} .top-nav{flex-direction:column;align-items:stretch;gap:.3rem;padding:.5rem 1rem} .top-nav .nav-links{justify-content:center} .top-nav .user-area{justify-content:center;flex-wrap:wrap} .login-card,.first-login-card{padding:2rem 1.5rem} .formations-grid{grid-template-columns:1fr} .main-content{padding:1rem 1rem 2rem} #banner{padding:.6rem 1rem;font-size:.85rem} .console-tabs button{padding:.5rem 1rem;font-size:.8rem} .formation-card{padding:1.2rem} .account-card{padding:1.2rem} .stats-grid{grid-template-columns:1fr 1fr} }
+        @media (max-width:480px){ .top-nav .nav-links button{padding:.3rem .8rem;font-size:.8rem} .login-card h1,.first-login-card h1{font-size:1.5rem} .page-title{font-size:1.3rem} .stats-grid{grid-template-columns:1fr} .chart-bar .bar-label{width:80px} }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div id="banner">
+        <span class="banner-icon">ⓘ</span>
+        <span class="banner-text" id="bannerText">Message d'information</span>
+        <button class="banner-close" id="bannerClose">✕</button>
+    </div>
 
+    <div id="loginScreen" class="screen-overlay">
+        <div class="login-card">
+            <h1>ARENA</h1>
+            <p class="subtitle">Portail de formation · académie</p>
+            <form id="loginForm" autocomplete="off">
+                <label for="loginId">Identifiant</label>
+                <input type="text" id="loginId" placeholder="votre identifiant" required />
+                <label for="loginPassword">Mot de passe</label>
+                <input type="password" id="loginPassword" placeholder="••••••" required />
+                <button type="submit" class="btn-primary" id="loginBtn">
+                    <span id="loginSpinner" class="spinner" style="display:none;"></span>
+                    Se connecter
+                </button>
+                <div id="loginError" class="error-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="firstLoginScreen" class="screen-overlay" style="display:none;">
+        <div class="first-login-card">
+            <h1>Bienvenue</h1>
+            <p class="subtitle">Vous devez personnaliser votre mot de passe</p>
+            <form id="firstLoginForm" autocomplete="off">
+                <label for="newPassword">Nouveau mot de passe</label>
+                <input type="password" id="newPassword" placeholder="••••••" required minlength="4" />
+                <label for="confirmPassword">Confirmer</label>
+                <input type="password" id="confirmPassword" placeholder="••••••" required minlength="4" />
+                <button type="submit" class="btn-primary">Enregistrer</button>
+                <div id="firstLoginError" class="error-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="mainApp" style="display:none;flex:1;flex-direction:column;">
+        <nav class="top-nav" id="topNav">
+            <div class="brand">ARENA <span>·</span> formation</div>
+            <div class="nav-links" id="navLinks"></div>
+            <div class="user-area">
+                <span class="notification-bell" id="notificationBell" title="Notifications">
+                    🔔
+                    <span class="badge" id="notifBadge" style="display:none;">0</span>
+                </span>
+                <span class="user-badge" id="userBadge"></span>
+                <span class="user-role" id="userRoleBadge"></span>
+                <button class="logout-btn" id="logoutBtn">Déconnexion</button>
+            </div>
+        </nav>
+        <div class="main-content" id="mainContent"></div>
+    </div>
+</div>
+
+<div id="firebaseStatus" class="offline">⛔ Hors ligne (local)</div>
+
+<script>
+    // ============================================================
+    //  FIREBASE CONFIG (vos clés)
+    // ============================================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDwkVWPaK3BJqGWXsmpGQYFSbkyISaRGdA",
+        authDomain: "arena-formation-7520e.firebaseapp.com",
+        databaseURL: "https://arena-formation-7520e-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "arena-formation-7520e",
+        storageBucket: "arena-formation-7520e.firebasestorage.app",
+        messagingSenderId: "22941070544",
+        appId: "1:22941070544:web:488b3ea89051b032bcdad5"
+    };
+
+    // ============================================================
+    //  INIT FIREBASE
+    // ============================================================
+    let firebaseApp, database, firebaseRef;
+    let firebaseConnected = false;
+    try {
+        firebaseApp = firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        firebaseRef = database.ref('arena_data');
+        firebaseRef.once('value').then(() => {
+            firebaseConnected = true;
+            document.getElementById('firebaseStatus').textContent = '✅ Connecté à Firebase';
+            document.getElementById('firebaseStatus').className = 'online';
+            loadFromFirebase();
+        }).catch(() => {
+            firebaseConnected = false;
+            document.getElementById('firebaseStatus').textContent = '⚠️ Firebase indisponible (fallback local)';
+            document.getElementById('firebaseStatus').className = 'offline';
+            initFromLocalStorage();
+        });
+    } catch(e) {
+        console.warn('Firebase init error:', e);
+        firebaseConnected = false;
+        document.getElementById('firebaseStatus').textContent = '⚠️ Firebase non configuré (fallback local)';
+        document.getElementById('firebaseStatus').className = 'offline';
+        initFromLocalStorage();
+    }
+
+    // ============================================================
+    //  DATA LAYER (SANCTUARISATION RENFORCÉE)
+    // ============================================================
+    let db = null;
+    let dbLoaded = false;
+
+    function createDefaultDB() {
+        return {
+            users: [{
+                id: 'admin',
+                nom: 'Admin',
+                prenom: 'Système',
+                password: 'admin',
+                role: 'admin',
+                firstLogin: true,
+                preferences: { theme: 'light' },
+                loginAttempts: 0,
+                lockedUntil: null
+            }],
+            formations: [],
+            banner: { text: '', color: '#f9e9b0', active: false },
+            tickets: [],
+            faqs: [],
+            announcements: [],
+            logs: [],
+            settings: { theme: 'light', language: 'fr', maxLoginAttempts: 3, lockDuration: 5 },
+            nextId: { formation: 1, ticket: 1, announcement: 1, faq: 1, log: 1 },
+            notifications: []
+        };
+    }
+
+    function sanitizeDB(db) {
+        if (!db || typeof db !== 'object') return createDefaultDB();
+        if (!Array.isArray(db.users)) db.users = [];
+        if (!Array.isArray(db.formations)) db.formations = [];
+        if (!db.banner || typeof db.banner !== 'object') db.banner = { text: '', color: '#f9e9b0', active: false };
+        if (!Array.isArray(db.tickets)) db.tickets = [];
+        if (!Array.isArray(db.faqs)) db.faqs = [];
+        if (!Array.isArray(db.announcements)) db.announcements = [];
+        if (!Array.isArray(db.logs)) db.logs = [];
+        if (!db.settings || typeof db.settings !== 'object') db.settings = { theme: 'light', language: 'fr', maxLoginAttempts: 3, lockDuration: 5 };
+        if (!Array.isArray(db.notifications)) db.notifications = [];
+        if (!db.nextId || typeof db.nextId !== 'object') db.nextId = { formation: 1, ticket: 1, announcement: 1, faq: 1, log: 1 };
+        db.formations = db.formations.map(f => {
+            if (!f || typeof f !== 'object') return null;
+            if (!f.id) f.id = db.nextId.formation++;
+            if (!f.nom) f.nom = 'Formation';
+            if (!f.prenom) f.prenom = 'Formateur';
+            if (!f.type) f.type = 'Générale';
+            if (!f.dateDebutInscription) f.dateDebutInscription = new Date().toISOString().slice(0,10);
+            if (!f.dateFinInscription) f.dateFinInscription = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+            if (!f.dateFormation) f.dateFormation = new Date(Date.now()+14*86400000).toISOString().slice(0,10);
+            if (!f.lieu) f.lieu = '—';
+            if (!f.description) f.description = '';
+            if (!Array.isArray(f.inscrits)) f.inscrits = [];
+            if (!Array.isArray(f.waitlist)) f.waitlist = [];
+            if (!Array.isArray(f.evaluations)) f.evaluations = [];
+            return f;
+        }).filter(f => f !== null);
+        db.users = db.users.map(u => {
+            if (!u || typeof u !== 'object') return null;
+            if (!u.id) return null;
+            if (!u.nom) u.nom = 'Inconnu';
+            if (!u.prenom) u.prenom = 'Inconnu';
+            if (!u.password) u.password = '000000';
+            if (!u.role) u.role = 'personnel';
+            if (typeof u.firstLogin !== 'boolean') u.firstLogin = true;
+            if (!u.preferences || typeof u.preferences !== 'object') u.preferences = { theme: 'light' };
+            if (typeof u.loginAttempts !== 'number') u.loginAttempts = 0;
+            if (u.lockedUntil && typeof u.lockedUntil !== 'string') u.lockedUntil = null;
+            return u;
+        }).filter(u => u !== null);
+        const admin = db.users.find(u => u.id === 'admin');
+        if (!admin) {
+            db.users.push({
+                id: 'admin',
+                nom: 'Admin',
+                prenom: 'Système',
+                password: 'admin',
+                role: 'admin',
+                firstLogin: true,
+                preferences: { theme: 'light' },
+                loginAttempts: 0,
+                lockedUntil: null
+            });
+        } else {
+            if (admin.firstLogin) admin.password = 'admin';
+        }
+        ['formation','ticket','announcement','faq','log'].forEach(k => {
+            if (typeof db.nextId[k] !== 'number' || isNaN(db.nextId[k]) || db.nextId[k] < 1) db.nextId[k] = 1;
+        });
+        if (!Array.isArray(db.logs)) db.logs = [];
+        if (!Array.isArray(db.notifications)) db.notifications = [];
+        db.tickets = db.tickets.map(t => {
+            if (!t || typeof t !== 'object') return null;
+            if (!t.id) t.id = db.nextId.ticket++;
+            if (!t.userId) t.userId = 'inconnu';
+            if (!t.sujet) t.sujet = 'Sans sujet';
+            if (!t.message) t.message = '—';
+            if (!t.status) t.status = 'ouvert';
+            if (!t.timestamp) t.timestamp = new Date().toISOString();
+            if (t.reponse && typeof t.reponse !== 'string') t.reponse = null;
+            return t;
+        }).filter(t => t !== null);
+        db.faqs = db.faqs.map(f => {
+            if (!f || typeof f !== 'object') return null;
+            if (!f.id) f.id = Date.now()+Math.random();
+            if (!f.question) f.question = 'Question';
+            if (!f.reponse) f.reponse = 'Réponse';
+            return f;
+        }).filter(f => f !== null);
+        db.announcements = db.announcements.map(a => {
+            if (!a || typeof a !== 'object') return null;
+            if (!a.id) a.id = db.nextId.announcement++;
+            if (!a.titre) a.titre = 'Annonce';
+            if (!a.contenu) a.contenu = '—';
+            if (!a.timestamp) a.timestamp = new Date().toISOString();
+            return a;
+        }).filter(a => a !== null);
+        return db;
+    }
+
+    function saveToLocalStorage(data) {
+        try { localStorage.setItem('arena_data', JSON.stringify(data)); } catch(e) {}
+    }
+
+    function saveDB(data) {
+        db = sanitizeDB(data);
+        saveToLocalStorage(db);
+        if (firebaseConnected && firebaseRef) {
+            firebaseRef.set(db).catch(() => {});
+        }
+    }
+
+    function initFromLocalStorage() {
+        const raw = localStorage.getItem('arena_data');
+        if (raw) {
+            try { db = JSON.parse(raw); } catch(_) { db = null; }
+        }
+        if (!db) db = createDefaultDB();
+        db = sanitizeDB(db);
+        saveToLocalStorage(db);
+        dbLoaded = true;
+        checkAdminAndStart();
+    }
+
+    function loadFromFirebase() {
+        firebaseRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                db = data;
+                db = sanitizeDB(db);
+                saveToLocalStorage(db);
+                dbLoaded = true;
+                checkAdminAndStart();
+            } else {
+                const local = localStorage.getItem('arena_data');
+                if (local) {
+                    try { db = JSON.parse(local); } catch(_) { db = null; }
+                }
+                if (!db) db = createDefaultDB();
+                db = sanitizeDB(db);
+                firebaseRef.set(db).catch(() => {});
+                saveToLocalStorage(db);
+                dbLoaded = true;
+                checkAdminAndStart();
+            }
+        }, (error) => {
+            console.error('Firebase read error:', error);
+            firebaseConnected = false;
+            document.getElementById('firebaseStatus').textContent = '⚠️ Firebase erreur (fallback local)';
+            document.getElementById('firebaseStatus').className = 'offline';
+            initFromLocalStorage();
+        });
+    }
+
+    // ============================================================
+    //  HELPERS
+    // ============================================================
+    function findUser(db, id) {
+        if (!db || !Array.isArray(db.users)) return null;
+        return db.users.find(u => u && u.id === id) || null;
+    }
+    function findFormation(db, id) {
+        if (!db || !Array.isArray(db.formations)) return null;
+        return db.formations.find(f => f && f.id === id) || null;
+    }
+    function findTicket(db, id) {
+        if (!db || !Array.isArray(db.tickets)) return null;
+        return db.tickets.find(t => t && t.id === id) || null;
+    }
+    function generatePassword() {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let pwd = '';
+        for (let i=0; i<6; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+        return pwd;
+    }
+    function formatDate(d) { if (!d) return ''; const parts = d.split('-'); if (parts.length===3) return parts[2]+'/'+parts[1]+'/'+parts[0]; return d; }
+    function todayStr() { return new Date().toISOString().slice(0,10); }
+    function isRegistrationOpen(f) { if (!f || !f.dateDebutInscription || !f.dateFinInscription) return false; return f.dateDebutInscription <= todayStr() && f.dateFinInscription >= todayStr(); }
+    function userIsRegistered(db, userId, fid) {
+        const f = findFormation(db, fid);
+        if (!f || !Array.isArray(f.inscrits)) return false;
+        return f.inscrits.includes(userId);
+    }
+    function userInWaitlist(db, userId, fid) {
+        const f = findFormation(db, fid);
+        if (!f || !Array.isArray(f.waitlist)) return false;
+        return f.waitlist.includes(userId);
+    }
+    function getUserName(db, userId) {
+        const u = findUser(db, userId);
+        return u ? (u.prenom+' '+u.nom) : userId;
+    }
+    function getRoleLabel(role) { const map = {admin:'Admin', professeur:'Professeur', personnel:'Personnel'}; return map[role] || role; }
+    function addLog(db, userId, action, details) {
+        if (!db || !Array.isArray(db.logs)) return;
+        if (!db.nextId) db.nextId = { formation:1, ticket:1, announcement:1, faq:1, log:1 };
+        if (typeof db.nextId.log !== 'number' || isNaN(db.nextId.log)) db.nextId.log = 1;
+        const id = db.nextId.log++;
+        db.logs.push({ id, userId, action, details: details||'', timestamp: new Date().toISOString(), ip: '192.168.1.'+Math.floor(Math.random()*255) });
+        saveDB(db);
+    }
+    function addNotification(db, userId, message) {
+        if (!db || !Array.isArray(db.notifications)) return;
+        db.notifications.push({ id: Date.now()+Math.random(), userId, message, read: false, timestamp: new Date().toISOString() });
+        saveDB(db);
+    }
+    function getUnreadCount(db, userId) {
+        if (!db || !Array.isArray(db.notifications)) return 0;
+        return db.notifications.filter(n => n && n.userId === userId && !n.read).length;
+    }
+
+    // ---- Fonctions intelligentes ----
+    // Vérifier les rappels automatiques (formations dans 2 jours)
+    function checkReminders() {
+        if (!db || !Array.isArray(db.formations)) return;
+        const today = new Date();
+        const twoDaysLater = new Date(today);
+        twoDaysLater.setDate(twoDaysLater.getDate() + 2);
+        const twoDaysStr = twoDaysLater.toISOString().slice(0,10);
+        db.formations.forEach(f => {
+            if (f.dateFormation === twoDaysStr && Array.isArray(f.inscrits)) {
+                f.inscrits.forEach(userId => {
+                    addNotification(db, userId, `Rappel : la formation "${f.nom} ${f.prenom}" a lieu dans 2 jours.`);
+                });
+            }
+        });
+    }
+
+    // Annuler une inscription
+    function cancelInscription(userId, fid) {
+        const f = findFormation(db, fid);
+        if (!f) return false;
+        if (!Array.isArray(f.inscrits)) return false;
+        const idx = f.inscrits.indexOf(userId);
+        if (idx === -1) return false;
+        f.inscrits.splice(idx, 1);
+        // Si place libérée, on peut prendre le premier de la waitlist
+        if (Array.isArray(f.waitlist) && f.waitlist.length > 0) {
+            const next = f.waitlist.shift();
+            f.inscrits.push(next);
+            addNotification(db, next, `Vous avez été promu(e) de la liste d'attente pour "${f.nom} ${f.prenom}".`);
+        }
+        saveDB(db);
+        addLog(db, userId, 'annulation', `Annulation inscription formation ${f.id}`);
+        return true;
+    }
+
+    // ============================================================
+    //  AUTH
+    // ============================================================
+    function login(id, password) {
+        if (!db) return { ok: false, msg: 'Base de données non chargée.' };
+        const user = findUser(db, id);
+        if (!user) return { ok: false, msg: 'Identifiant inconnu.' };
+        if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+            const remaining = Math.ceil((new Date(user.lockedUntil) - new Date()) / 60000);
+            return { ok: false, msg: `Compte verrouillé. Réessayez dans ${remaining} minute(s).` };
+        }
+        if (user.password !== password) {
+            user.loginAttempts = (user.loginAttempts || 0) + 1;
+            const max = db.settings.maxLoginAttempts || 3;
+            if (user.loginAttempts >= max) {
+                const lockMin = db.settings.lockDuration || 5;
+                user.lockedUntil = new Date(Date.now() + lockMin*60000).toISOString();
+                saveDB(db);
+                return { ok: false, msg: `Trop de tentatives. Compte verrouillé pour ${lockMin} min.` };
+            }
+            saveDB(db);
+            return { ok: false, msg: 'Mot de passe incorrect.' };
+        }
+        user.loginAttempts = 0;
+        user.lockedUntil = null;
+        currentUser = user;
+        addLog(db, user.id, 'connexion', 'Connexion réussie');
+        // Vérifier les rappels après connexion
+        checkReminders();
+        console.log('✅ Connexion réussie pour', id);
+        return { ok: true };
+    }
+
+    function changePassword(userId, newPwd, keepFirstLogin = false) {
+        const user = findUser(db, userId);
+        if (!user) return false;
+        user.password = newPwd;
+        if (!keepFirstLogin) user.firstLogin = false;
+        else user.firstLogin = true;
+        saveDB(db);
+        return true;
+    }
+
+    // Mise à jour du profil (nom, prénom, rôle)
+    function updateUserProfile(userId, newNom, newPrenom, newRole) {
+        const user = findUser(db, userId);
+        if (!user) return false;
+        if (userId === 'admin' && newRole && newRole !== 'admin') return false; // admin ne peut pas changer son rôle
+        user.nom = newNom || user.nom;
+        user.prenom = newPrenom || user.prenom;
+        if (newRole && (userId !== 'admin' || newRole === 'admin')) {
+            user.role = newRole;
+        }
+        saveDB(db);
+        return true;
+    }
+
+    // ============================================================
+    //  STATE
+    // ============================================================
+    let currentUser = null;
+    let currentPage = 'formations';
+    let consoleTab = 'dashboard';
+
+    // ============================================================
+    //  RENDER FUNCTIONS
+    // ============================================================
+    function renderApp() {
+        if (!currentUser || !db) return;
+        renderNav();
+        renderPage(currentPage);
+        renderBanner();
+        updateNotificationBadge();
+        applyTheme();
+    }
+
+    function applyTheme() {
+        const theme = currentUser?.preferences?.theme || db.settings?.theme || 'light';
+        document.body.classList.toggle('dark', theme === 'dark');
+    }
+
+    function updateNotificationBadge() {
+        const count = getUnreadCount(db, currentUser.id);
+        const badge = document.getElementById('notifBadge');
+        if (count > 0) { badge.style.display = 'inline'; badge.textContent = count; }
+        else { badge.style.display = 'none'; }
+    }
+
+    function renderNav() {
+        const container = document.getElementById('navLinks');
+        const isAdmin = currentUser.role === 'admin';
+        let links = [];
+        links.push({ id: 'formations', label: 'Formations' });
+        links.push({ id: 'dashboard', label: 'Tableau de bord' }); // pour tous
+        if (isAdmin) links.push({ id: 'console', label: 'Console Admin' });
+        links.push({ id: 'moncompte', label: 'Mon compte' });
+        container.innerHTML = links.map(l =>
+            `<button class="${currentPage === l.id ? 'active' : ''}" data-page="${l.id}">${l.label}</button>`
+        ).join('');
+        container.querySelectorAll('button[data-page]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentPage = btn.dataset.page;
+                if (currentPage === 'console') consoleTab = 'dashboard';
+                renderApp();
+            });
+        });
+        document.getElementById('userBadge').textContent = currentUser.prenom+' '+currentUser.nom+' ('+currentUser.id+')';
+        document.getElementById('userRoleBadge').textContent = getRoleLabel(currentUser.role);
+        document.getElementById('notificationBell').addEventListener('click', toggleNotifications);
+    }
+
+    function toggleNotifications() {
+        const notifs = (db.notifications || []).filter(n => n && n.userId === currentUser.id);
+        if (notifs.length === 0) { alert('Aucune notification.'); return; }
+        let msg = '📬 Notifications :\n\n';
+        notifs.forEach(n => {
+            msg += (n.read ? '✓ ' : '⬜ ') + n.message + ' (' + new Date(n.timestamp).toLocaleString() + ')\n';
+        });
+        msg += '\nCliquez sur "OK" pour marquer tout comme lu.';
+        if (confirm(msg)) {
+            db.notifications.forEach(n => { if (n && n.userId === currentUser.id) n.read = true; });
+            saveDB(db);
+            updateNotificationBadge();
+        }
+    }
+
+    function renderBanner() {
+        const banner = document.getElementById('banner');
+        const text = document.getElementById('bannerText');
+        if (db.banner && db.banner.active && db.banner.text) {
+            banner.style.background = db.banner.color || '#f9e9b0';
+            text.textContent = db.banner.text;
+            banner.classList.add('active');
+        } else {
+            banner.classList.remove('active');
+        }
+    }
+
+    function renderPage(page) {
+        const container = document.getElementById('mainContent');
+        if (page === 'formations') renderFormations(container);
+        else if (page === 'dashboard') renderDashboardUser(container);
+        else if (page === 'console') renderConsole(container);
+        else if (page === 'moncompte') renderMonCompte(container);
+        else renderFormations(container);
+    }
+
+    // ---- PAGE DASHBOARD (pour tous) ----
+    function renderDashboardUser(container) {
+        const upcoming = (Array.isArray(db.formations) ? db.formations : [])
+            .filter(f => f.dateFormation >= todayStr())
+            .sort((a,b) => a.dateFormation.localeCompare(b.dateFormation))
+            .slice(0, 5);
+        const myRegistrations = (Array.isArray(db.formations) ? db.formations : [])
+            .filter(f => Array.isArray(f.inscrits) && f.inscrits.includes(currentUser.id));
+        const totalFormations = Array.isArray(db.formations) ? db.formations.length : 0;
+        const totalInscriptions = (Array.isArray(db.formations) ? db.formations : [])
+            .reduce((acc, f) => acc + (Array.isArray(f.inscrits) ? f.inscrits.length : 0), 0);
+
+        let html = `<div class="page active">
+            <h2 class="page-title">Tableau de bord</h2>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-number">${totalFormations}</div><div class="stat-label">Total formations</div></div>
+                <div class="stat-card"><div class="stat-number">${totalInscriptions}</div><div class="stat-label">Inscriptions totales</div></div>
+                <div class="stat-card"><div class="stat-number">${myRegistrations.length}</div><div class="stat-label">Mes inscriptions</div></div>
+                <div class="stat-card"><div class="stat-number">${getUnreadCount(db, currentUser.id)}</div><div class="stat-label">Notifications</div></div>
+            </div>
+            <h3 style="margin:1.5rem 0 0.5rem;">Prochaines formations</h3>
+            ${upcoming.length === 0 ? '<p style="color:#5e6f8d;">Aucune formation à venir.</p>' :
+                upcoming.map(f => `
+                    <div style="padding:0.6rem;border-bottom:1px solid #e9eef4;display:flex;justify-content:space-between;flex-wrap:wrap;">
+                        <span><strong>${f.nom} ${f.prenom}</strong> — ${f.type||'Générale'}</span>
+                        <span style="color:#5e6f8d;font-size:0.85rem;">${formatDate(f.dateFormation)} · ${f.lieu||'—'}</span>
+                    </div>
+                `).join('')
+            }
+            <h3 style="margin:1.5rem 0 0.5rem;">Mes inscriptions</h3>
+            ${myRegistrations.length === 0 ? '<p style="color:#5e6f8d;">Vous n\'êtes inscrit à aucune formation.</p>' :
+                myRegistrations.map(f => `
+                    <div style="padding:0.6rem;border-bottom:1px solid #e9eef4;display:flex;justify-content:space-between;flex-wrap:wrap;">
+                        <span><strong>${f.nom} ${f.prenom}</strong> — ${f.type||'Générale'}</span>
+                        <span style="color:#5e6f8d;font-size:0.85rem;">${formatDate(f.dateFormation)} · ${f.lieu||'—'}</span>
+                    </div>
+                `).join('')
+            }
+        </div>`;
+        container.innerHTML = html;
+    }
+
+    // ---- PAGE FORMATIONS (avec annulation) ----
+    function renderFormations(container) {
+        const isAdmin = currentUser.role === 'admin';
+        let formations = Array.isArray(db.formations) ? db.formations.slice() : [];
+        const showArchives = sessionStorage.getItem('showArchives') === 'true';
+        if (!showArchives && !isAdmin) {
+            formations = formations.filter(f => f && f.dateFormation && f.dateFormation >= todayStr());
+        }
+        const filterType = document.getElementById('filterType')?.value || '';
+        const filterLieu = document.getElementById('filterLieu')?.value || '';
+        if (filterType) formations = formations.filter(f => f && f.type && f.type.toLowerCase().includes(filterType.toLowerCase()));
+        if (filterLieu) formations = formations.filter(f => f && f.lieu && f.lieu.toLowerCase().includes(filterLieu.toLowerCase()));
+
+        let html = `<div class="page active">
+            <div class="flex-between mb-1">
+                <h2 class="page-title">Formations <small>disponibles</small></h2>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <input type="text" id="filterType" placeholder="Filtrer par type" style="padding:0.4rem 0.8rem;border:2px solid #dce3ed;border-radius:8px;font-size:0.85rem;" />
+                    <input type="text" id="filterLieu" placeholder="Filtrer par lieu" style="padding:0.4rem 0.8rem;border:2px solid #dce3ed;border-radius:8px;font-size:0.85rem;" />
+                    <button class="btn-secondary" id="clearFilters" style="padding:0.3rem 1rem;">Effacer</button>
+                    ${!isAdmin ? `<button class="btn-secondary" id="toggleArchives" style="padding:0.3rem 1rem;">${showArchives ? 'Masquer archives' : 'Voir archives'}</button>` : ''}
+                </div>
+            </div>`;
+        if (formations.length === 0) {
+            html += `<div class="empty-state"><p>Aucune formation correspondante.</p></div>`;
+        } else {
+            html += `<div class="formations-grid">`;
+            formations.forEach(f => {
+                const open = isRegistrationOpen(f);
+                const registered = userIsRegistered(db, currentUser.id, f.id);
+                const inWaitlist = userInWaitlist(db, currentUser.id, f.id);
+                const inscritsCount = Array.isArray(f.inscrits) ? f.inscrits.length : 0;
+                const capacity = f.capacite || Infinity;
+                const isFull = inscritsCount >= capacity;
+                const canRegister = open && !registered && !inWaitlist && !isFull;
+                const showWaitlist = open && !registered && isFull;
+                let evalHtml = '';
+                if (f.dateFormation < todayStr() && registered) {
+                    const existing = (Array.isArray(f.evaluations) ? f.evaluations : []).find(e => e && e.userId === currentUser.id);
+                    evalHtml = `<div class="evaluation">
+                        <div style="font-size:0.8rem;color:#5e6f8d;">Évaluer cette formation :</div>
+                        <div class="stars" data-fid="${f.id}">
+                            ${[1,2,3,4,5].map(s => `<span class="star ${existing && existing.note >= s ? 'active' : ''}" data-value="${s}">★</span>`).join('')}
+                        </div>
+                        ${existing ? `<div style="font-size:0.8rem;color:#1d7a4a;">Votre note : ${existing.note}/5</div>` : ''}
+                        ${!existing ? `<input type="text" id="evalComment-${f.id}" placeholder="Votre commentaire (optionnel)" style="margin-top:0.3rem;padding:0.3rem;width:100%;border:2px solid #dce3ed;border-radius:8px;font-size:0.8rem;" />` : ''}
+                        ${!existing ? `<button class="btn-secondary" data-action="submitEval" data-fid="${f.id}" style="margin-top:0.3rem;padding:0.2rem 1rem;font-size:0.8rem;">Soumettre</button>` : ''}
+                    </div>`;
+                }
+                html += `<div class="formation-card">
+                    <h3>${f.nom} ${f.prenom}</h3>
+                    <div class="trainer">Formateur·rice : ${f.prenom} ${f.nom}</div>
+                    <div class="meta">
+                        <strong>Type :</strong> ${f.type||'Générale'}<br/>
+                        <strong>Lieu :</strong> ${f.lieu||'—'}<br/>
+                        <strong>Date :</strong> ${formatDate(f.dateFormation)}<br/>
+                        <strong>Inscriptions :</strong> ${formatDate(f.dateDebutInscription)} → ${formatDate(f.dateFinInscription)}<br/>
+                        <strong>Places :</strong> ${inscritsCount}${capacity !== Infinity ? '/'+capacity : ''} ${isFull ? '⚠️ Complet' : ''}
+                    </div>
+                    <div class="desc">${f.description||'Aucune description.'}</div>
+                    <div class="card-actions">
+                        ${!isAdmin ? `
+                            ${registered ? `<span class="inscrit-badge">✓ Inscrit·e</span>` :
+                              inWaitlist ? `<span class="waiting-badge">⏳ En liste d'attente</span>` :
+                              canRegister ? `<button class="btn-success" data-action="register" data-fid="${f.id}">S'inscrire</button>` :
+                              showWaitlist ? `<span style="font-size:0.8rem;color:#b06a1a;">Liste d'attente (complet)</span>` :
+                              `<span style="font-size:0.8rem;color:#a0aec0;">Inscriptions fermées</span>`
+                            }
+                            ${registered ? `<button class="btn-danger" data-action="cancel" data-fid="${f.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Annuler</button>` : ''}
+                        ` : `
+                            <span class="inscrit-badge">${inscritsCount} inscrit·e${inscritsCount>1?'s':''}</span>
+                            ${(Array.isArray(f.waitlist) && f.waitlist.length > 0) ? `<span class="waiting-badge">${f.waitlist.length} en attente</span>` : ''}
+                        `}
+                        ${isAdmin ? `<button class="btn-secondary" data-action="viewRegistrants" data-fid="${f.id}">Voir les inscrits</button>` : ''}
+                        ${isAdmin ? `<button class="btn-secondary" data-action="exportRegistrants" data-fid="${f.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">📤 CSV</button>` : ''}
+                    </div>
+                    ${isAdmin ? `<div class="registrants-list" id="registrants-${f.id}" style="display:none;margin-top:0.4rem;">
+                        ${(Array.isArray(f.inscrits) && f.inscrits.length === 0) ? 'Aucun inscrit.' : (Array.isArray(f.inscrits) ? f.inscrits.map(id => getUserName(db, id)).join(', ') : '')}
+                        ${(Array.isArray(f.waitlist) && f.waitlist.length > 0) ? `<br/><strong>Liste d'attente :</strong> ${f.waitlist.map(id => getUserName(db, id)).join(', ')}` : ''}
+                    </div>` : ''}
+                    ${evalHtml}
+                </div>`;
+            });
+            html += `</div>`;
+        }
+        html += `</div>`;
+        container.innerHTML = html;
+
+        // Events
+        document.getElementById('filterType')?.addEventListener('input', renderApp);
+        document.getElementById('filterLieu')?.addEventListener('input', renderApp);
+        document.getElementById('clearFilters')?.addEventListener('click', () => {
+            document.getElementById('filterType').value = '';
+            document.getElementById('filterLieu').value = '';
+            renderApp();
+        });
+        document.getElementById('toggleArchives')?.addEventListener('click', () => {
+            sessionStorage.setItem('showArchives', String(!(sessionStorage.getItem('showArchives') === 'true')));
+            renderApp();
+        });
+        container.querySelectorAll('[data-action="register"]').forEach(btn => {
+            btn.addEventListener('click', () => { registerToFormation(parseInt(btn.dataset.fid)); });
+        });
+        container.querySelectorAll('[data-action="cancel"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const fid = parseInt(btn.dataset.fid);
+                if (confirm('Annuler votre inscription ?')) {
+                    if (cancelInscription(currentUser.id, fid)) {
+                        alert('Inscription annulée.');
+                        renderApp();
+                    } else {
+                        alert('Erreur lors de l\'annulation.');
+                    }
+                }
+            });
+        });
+        container.querySelectorAll('[data-action="viewRegistrants"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const fid = parseInt(btn.dataset.fid);
+                const el = document.getElementById('registrants-'+fid);
+                if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+        container.querySelectorAll('[data-action="exportRegistrants"]').forEach(btn => {
+            btn.addEventListener('click', () => { exportRegistrants(parseInt(btn.dataset.fid)); });
+        });
+        container.querySelectorAll('[data-action="submitEval"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const fid = parseInt(btn.dataset.fid);
+                const stars = btn.closest('.formation-card').querySelectorAll('.star.active');
+                const note = stars.length;
+                const comment = document.getElementById('evalComment-'+fid)?.value || '';
+                if (note === 0) { alert('Veuillez sélectionner une note.'); return; }
+                submitEvaluation(fid, note, comment);
+            });
+        });
+        container.querySelectorAll('.stars').forEach(starContainer => {
+            starContainer.querySelectorAll('.star').forEach(star => {
+                star.addEventListener('click', () => {
+                    const val = parseInt(star.dataset.value);
+                    starContainer.querySelectorAll('.star').forEach(s => {
+                        s.classList.toggle('active', parseInt(s.dataset.value) <= val);
+                    });
+                });
+            });
+        });
+    }
+
+    function registerToFormation(fid) {
+        const f = findFormation(db, fid);
+        if (!f) return;
+        if (userIsRegistered(db, currentUser.id, fid) || userInWaitlist(db, currentUser.id, fid)) {
+            alert('Vous êtes déjà inscrit ou en liste d\'attente.');
+            return;
+        }
+        if (!isRegistrationOpen(f)) { alert('Les inscriptions sont fermées.'); return; }
+        const capacity = f.capacite || Infinity;
+        const inscrits = Array.isArray(f.inscrits) ? f.inscrits : [];
+        if (inscrits.length < capacity) {
+            if (!Array.isArray(f.inscrits)) f.inscrits = [];
+            f.inscrits.push(currentUser.id);
+            addNotification(db, currentUser.id, `Vous êtes inscrit à la formation "${f.nom} ${f.prenom}".`);
+            addLog(db, currentUser.id, 'inscription', `Inscription à la formation ${f.id}`);
+        } else {
+            if (!Array.isArray(f.waitlist)) f.waitlist = [];
+            f.waitlist.push(currentUser.id);
+            addNotification(db, currentUser.id, `Vous êtes en liste d'attente pour "${f.nom} ${f.prenom}".`);
+        }
+        saveDB(db);
+        renderApp();
+        alert('Inscription prise en compte !');
+    }
+
+    function submitEvaluation(fid, note, comment) {
+        const f = findFormation(db, fid);
+        if (!f) return;
+        if (!Array.isArray(f.evaluations)) f.evaluations = [];
+        if (f.evaluations.find(e => e && e.userId === currentUser.id)) { alert('Vous avez déjà évalué.'); return; }
+        f.evaluations.push({ userId: currentUser.id, note, comment: comment||'', timestamp: new Date().toISOString() });
+        saveDB(db);
+        renderApp();
+        alert('Merci pour votre évaluation !');
+    }
+
+    function exportRegistrants(fid) {
+        const f = findFormation(db, fid);
+        if (!f) return;
+        const inscrits = (Array.isArray(f.inscrits) ? f.inscrits : []).map(id => getUserName(db, id));
+        if (inscrits.length === 0) { alert('Aucun inscrit.'); return; }
+        let csv = 'Nom,Prénom\n';
+        inscrits.forEach(name => {
+            const parts = name.split(' ');
+            const nom = parts[1] || '';
+            const prenom = parts[0] || '';
+            csv += `${nom},${prenom}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `inscrits_formation_${f.id}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+
+    // ---- PAGE MON COMPTE (avec édition de profil) ----
+    function renderMonCompte(container) {
+        const user = currentUser;
+        const registrations = (Array.isArray(db.formations) ? db.formations : []).filter(f => f && Array.isArray(f.inscrits) && f.inscrits.includes(user.id));
+        const tickets = (Array.isArray(db.tickets) ? db.tickets : []).filter(t => t && t.userId === user.id);
+
+        let html = `<div class="page active">
+            <h2 class="page-title">Mon compte</h2>
+            <div class="account-grid">
+                <div class="account-card">
+                    <h4>👤 Identité</h4>
+                    <div class="info-row"><span class="label">Identifiant</span><span class="value">${user.id}</span></div>
+                    <div class="info-row"><span class="label">Nom</span><span class="value">${user.nom}</span></div>
+                    <div class="info-row"><span class="label">Prénom</span><span class="value">${user.prenom}</span></div>
+                    <div class="info-row"><span class="label">Rôle</span><span class="value">${getRoleLabel(user.role)}</span></div>
+                </div>
+                <div class="account-card">
+                    <h4>✏️ Modifier le profil</h4>
+                    <form id="editProfileForm">
+                        <div class="form-group"><label>Nom</label><input type="text" id="editNom" value="${user.nom}" required /></div>
+                        <div class="form-group"><label>Prénom</label><input type="text" id="editPrenom" value="${user.prenom}" required /></div>
+                        <button type="submit" class="btn-primary" style="width:auto;padding:0.5rem 2rem;">Mettre à jour</button>
+                        <div id="editProfileMsg" class="success-msg"></div>
+                    </form>
+                </div>
+                <div class="account-card">
+                    <h4>🔑 Modifier le mot de passe</h4>
+                    <form id="changePwdForm">
+                        <div class="form-group"><label for="cpNew">Nouveau mot de passe</label><input type="password" id="cpNew" required minlength="4" /></div>
+                        <div class="form-group"><label for="cpConfirm">Confirmer</label><input type="password" id="cpConfirm" required minlength="4" /></div>
+                        <button type="submit" class="btn-primary" style="width:auto;padding:0.5rem 2rem;">Modifier</button>
+                        <div id="cpError" class="error-msg"></div><div id="cpSuccess" class="success-msg"></div>
+                    </form>
+                </div>
+            </div>
+            <div style="margin-top:2rem;"><div class="account-card">
+                <h4>📋 Historique des formations</h4>
+                ${registrations.length === 0 ? '<p style="color:#5e6f8d;">Aucune inscription.</p>' :
+                    registrations.map(f => `<div style="padding:0.5rem 0;border-bottom:1px solid #f0f4fe;display:flex;justify-content:space-between;flex-wrap:wrap;">
+                        <span><strong>${f.nom} ${f.prenom}</strong> — ${f.type||'Générale'}</span>
+                        <span style="color:#5e6f8d;font-size:0.85rem;">${formatDate(f.dateFormation)} · ${f.lieu||'—'}</span>
+                    </div>`).join('')
+                }
+            </div></div>
+            <div style="margin-top:2rem;"><div class="account-card">
+                <h4>💬 Tickets d'assistance</h4>
+                <button class="btn-secondary" id="newTicketBtn" style="margin-bottom:0.8rem;">+ Nouveau ticket</button>
+                <div id="ticketList">
+                    ${tickets.length === 0 ? '<p style="color:#5e6f8d;">Aucun ticket.</p>' :
+                        tickets.map(t => `<div class="ticket-item">
+                            <div class="ticket-header"><span><strong>${t.sujet}</strong></span><span class="ticket-status ${t.status}">${t.status}</span></div>
+                            <div style="font-size:0.85rem;margin-top:0.2rem;">${t.message}</div>
+                            ${t.reponse ? `<div style="margin-top:0.4rem;padding-top:0.4rem;border-top:1px solid #e9eef4;font-size:0.85rem;color:#1a3a62;"><strong>Réponse :</strong> ${t.reponse}</div>` : ''}
+                            <div style="font-size:0.7rem;color:#5e6f8d;margin-top:0.2rem;">${new Date(t.timestamp).toLocaleString()}</div>
+                        </div>`).join('')
+                    }
+                </div>
+            </div></div>
+            <div style="margin-top:2rem;"><div class="account-card">
+                <h4>⚙️ Préférences</h4>
+                <form id="prefForm">
+                    <div class="form-group"><label>Thème</label>
+                        <select id="prefTheme">
+                            <option value="light" ${user.preferences?.theme==='light'?'selected':''}>Clair</option>
+                            <option value="dark" ${user.preferences?.theme==='dark'?'selected':''}>Sombre</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-secondary" style="width:auto;padding:0.4rem 1.6rem;">Enregistrer</button>
+                    <div id="prefMsg" class="success-msg"></div>
+                </form>
+            </div></div>
+        </div>`;
+        container.innerHTML = html;
+
+        // Édition du profil
+        document.getElementById('editProfileForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nom = document.getElementById('editNom').value.trim();
+            const prenom = document.getElementById('editPrenom').value.trim();
+            if (!nom || !prenom) {
+                document.getElementById('editProfileMsg').textContent = 'Veuillez remplir tous les champs.';
+                document.getElementById('editProfileMsg').className = 'error-msg';
+                return;
+            }
+            if (updateUserProfile(currentUser.id, nom, prenom, currentUser.role)) {
+                document.getElementById('editProfileMsg').textContent = 'Profil mis à jour !';
+                document.getElementById('editProfileMsg').className = 'success-msg';
+                currentUser = findUser(db, currentUser.id);
+                renderApp();
+            } else {
+                document.getElementById('editProfileMsg').textContent = 'Erreur lors de la mise à jour.';
+                document.getElementById('editProfileMsg').className = 'error-msg';
+            }
+        });
+
+        document.getElementById('changePwdForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const p1 = document.getElementById('cpNew').value;
+            const p2 = document.getElementById('cpConfirm').value;
+            const err = document.getElementById('cpError');
+            const succ = document.getElementById('cpSuccess');
+            err.textContent = ''; succ.textContent = '';
+            if (p1.length < 4) { err.textContent = 'Minimum 4 caractères.'; return; }
+            if (p1 !== p2) { err.textContent = 'Les mots de passe ne correspondent pas.'; return; }
+            if (changePassword(currentUser.id, p1, false)) {
+                succ.textContent = 'Mot de passe modifié !';
+                document.getElementById('cpNew').value = '';
+                document.getElementById('cpConfirm').value = '';
+                currentUser = findUser(db, currentUser.id);
+            } else { err.textContent = 'Erreur.'; }
+        });
+
+        document.getElementById('prefForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const theme = document.getElementById('prefTheme').value;
+            if (!currentUser.preferences) currentUser.preferences = {};
+            currentUser.preferences.theme = theme;
+            const u = findUser(db, currentUser.id);
+            if (u) { u.preferences = currentUser.preferences; saveDB(db); }
+            document.getElementById('prefMsg').textContent = 'Préférences enregistrées !';
+            applyTheme();
+            setTimeout(() => { document.getElementById('prefMsg').textContent = ''; }, 3000);
+        });
+
+        document.getElementById('newTicketBtn').addEventListener('click', () => {
+            const sujet = prompt('Sujet du ticket :');
+            if (!sujet) return;
+            const message = prompt('Décrivez votre problème :');
+            if (!message) return;
+            if (!db.nextId) db.nextId = { formation:1, ticket:1, announcement:1, faq:1, log:1 };
+            if (typeof db.nextId.ticket !== 'number' || isNaN(db.nextId.ticket)) db.nextId.ticket = 1;
+            const ticket = {
+                id: db.nextId.ticket++,
+                userId: currentUser.id,
+                sujet: sujet.trim(),
+                message: message.trim(),
+                status: 'ouvert',
+                reponse: null,
+                timestamp: new Date().toISOString()
+            };
+            if (!Array.isArray(db.tickets)) db.tickets = [];
+            db.tickets.push(ticket);
+            addLog(db, currentUser.id, 'ticket_ouvert', `Ticket #${ticket.id}: ${sujet}`);
+            addNotification(db, 'admin', `Nouveau ticket de ${currentUser.id}: ${sujet}`);
+            saveDB(db);
+            renderApp();
+            alert('Ticket créé !');
+        });
+    }
+
+    // ---- CONSOLE ADMIN (avec édition des profils utilisateurs) ----
+    function renderConsole(container) {
+        let html = `<div class="page active">
+            <h2 class="page-title">Console administrateur</h2>
+            <div class="console-tabs">
+                <button class="${consoleTab==='dashboard'?'active':''}" data-ctab="dashboard">📊 Tableau de bord</button>
+                <button class="${consoleTab==='formations'?'active':''}" data-ctab="formations">📚 Formations</button>
+                <button class="${consoleTab==='comptes'?'active':''}" data-ctab="comptes">👤 Comptes</button>
+                <button class="${consoleTab==='annonces'?'active':''}" data-ctab="annonces">📢 Annonces</button>
+                <button class="${consoleTab==='faq'?'active':''}" data-ctab="faq">❓ FAQ</button>
+                <button class="${consoleTab==='tickets'?'active':''}" data-ctab="tickets">🎫 Tickets</button>
+                <button class="${consoleTab==='bandeau'?'active':''}" data-ctab="bandeau">ⓘ Bandeau</button>
+                <button class="${consoleTab==='parametres'?'active':''}" data-ctab="parametres">⚙️ Paramètres</button>
+            </div>
+            <div id="consolePanels">
+                <div class="console-panel ${consoleTab==='dashboard'?'active':''}" data-panel="dashboard">${renderDashboard()}</div>
+                <div class="console-panel ${consoleTab==='formations'?'active':''}" data-panel="formations">${renderAdminFormations()}</div>
+                <div class="console-panel ${consoleTab==='comptes'?'active':''}" data-panel="comptes">${renderAdminComptes()}</div>
+                <div class="console-panel ${consoleTab==='annonces'?'active':''}" data-panel="annonces">${renderAdminAnnonces()}</div>
+                <div class="console-panel ${consoleTab==='faq'?'active':''}" data-panel="faq">${renderAdminFAQ()}</div>
+                <div class="console-panel ${consoleTab==='tickets'?'active':''}" data-panel="tickets">${renderAdminTickets()}</div>
+                <div class="console-panel ${consoleTab==='bandeau'?'active':''}" data-panel="bandeau">${renderAdminBandeau()}</div>
+                <div class="console-panel ${consoleTab==='parametres'?'active':''}" data-panel="parametres">${renderAdminParametres()}</div>
+            </div>
+        </div>`;
+        container.innerHTML = html;
+
+        container.querySelectorAll('.console-tabs button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                consoleTab = btn.dataset.ctab;
+                renderApp();
+            });
+        });
+
+        initAdminFormations();
+        initAdminComptes();
+        initAdminAnnonces();
+        initAdminFAQ();
+        initAdminTickets();
+        initAdminBandeau();
+        initAdminParametres();
+    }
+
+    // ---- DASHBOARD ADMIN ----
+    function renderDashboard() {
+        const users = Array.isArray(db.users) ? db.users : [];
+        const formations = Array.isArray(db.formations) ? db.formations : [];
+        const totalUsers = users.filter(u => u && u.role !== 'admin').length;
+        const totalFormations = formations.length;
+        const totalInscriptions = formations.reduce((acc, f) => acc + (Array.isArray(f.inscrits) ? f.inscrits.length : 0), 0);
+        const avgParticipation = totalFormations > 0 ? (totalInscriptions / totalFormations) : 0;
+        const sorted = formations.slice().sort((a,b) => (Array.isArray(b.inscrits) ? b.inscrits.length : 0) - (Array.isArray(a.inscrits) ? a.inscrits.length : 0));
+        const top = sorted.slice(0,5);
+        let chartHtml = '';
+        if (top.length > 0) {
+            const maxCount = Math.max(...top.map(f => Array.isArray(f.inscrits) ? f.inscrits.length : 0), 1);
+            chartHtml = `<div style="margin-top:1rem;"><h4 style="margin-bottom:0.5rem;">Top formations (inscriptions)</h4>`;
+            top.forEach(f => {
+                const count = Array.isArray(f.inscrits) ? f.inscrits.length : 0;
+                const pct = (count / maxCount) * 100;
+                chartHtml += `<div class="chart-bar"><span class="bar-label">${f.nom} ${f.prenom}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width:${pct}%;"></div></div>
+                    <span class="bar-value">${count}</span></div>`;
+            });
+            chartHtml += `</div>`;
+        }
+        return `<div class="stats-grid">
+            <div class="stat-card"><div class="stat-number">${totalUsers}</div><div class="stat-label">Utilisateurs</div></div>
+            <div class="stat-card"><div class="stat-number">${totalFormations}</div><div class="stat-label">Formations</div></div>
+            <div class="stat-card"><div class="stat-number">${totalInscriptions}</div><div class="stat-label">Inscriptions totales</div></div>
+            <div class="stat-card"><div class="stat-number">${avgParticipation.toFixed(1)}</div><div class="stat-label">Moyenne / formation</div></div>
+        </div>${chartHtml}
+        <div style="margin-top:2rem;"><button class="btn-secondary" id="exportStatsBtn">📤 Exporter les statistiques (CSV)</button></div>`;
+    }
+
+    // ---- ADMIN FORMATIONS (identique) ----
+    function renderAdminFormations() {
+        let html = `<div style="margin-bottom:1.5rem;display:flex;flex-wrap:wrap;gap:0.8rem;">
+            <button class="btn-primary" id="showCreateFormation" style="width:auto;padding:0.5rem 1.6rem;">+ Nouvelle formation</button>
+            <button class="btn-secondary" id="importFormationsBtn" style="width:auto;padding:0.5rem 1.6rem;">📥 Importer CSV</button>
+            <button class="btn-secondary" id="exportAllFormationsBtn" style="width:auto;padding:0.5rem 1.6rem;">📤 Exporter tout</button>
+            <button class="btn-secondary" id="archiveToggleBtn" style="width:auto;padding:0.5rem 1.6rem;">📁 Voir archives</button>
+            <input type="file" id="csvFormationInput" accept=".csv" style="display:none;" />
+        </div>
+        <div id="createFormationForm" style="display:none;background:#f8faff;padding:1.5rem;border-radius:16px;border:1px solid #e9eef4;margin-bottom:2rem;">
+            <h4 style="margin-bottom:1rem;">Créer une formation</h4>
+            <form id="formationCreateForm">
+                <div class="form-row"><div class="form-group"><label>Nom du formateur·rice</label><input type="text" id="fNom" required /></div>
+                    <div class="form-group"><label>Prénom</label><input type="text" id="fPrenom" required /></div></div>
+                <div class="form-group"><label>Type</label><input type="text" id="fType" placeholder="ex: Pédagogie, Numérique..." /></div>
+                <div class="form-row"><div class="form-group"><label>Date début inscriptions</label><input type="date" id="fDateDebut" required /></div>
+                    <div class="form-group"><label>Date fin inscriptions</label><input type="date" id="fDateFin" required /></div></div>
+                <div class="form-row"><div class="form-group"><label>Date de la formation</label><input type="date" id="fDateFormation" required /></div>
+                    <div class="form-group"><label>Lieu</label><input type="text" id="fLieu" placeholder="Salle, ville..." /></div></div>
+                <div class="form-group"><label>Description</label><textarea id="fDescription" rows="2"></textarea></div>
+                <div class="form-group"><label>Capacité (laisser vide pour illimité)</label><input type="number" id="fCapacite" min="1" /></div>
+                <button type="submit" class="btn-primary" style="width:auto;padding:0.5rem 2rem;">Créer</button>
+                <button type="button" class="btn-secondary" id="cancelCreateFormation" style="width:auto;padding:0.5rem 1.6rem;">Annuler</button>
+                <div id="createFormationMsg"></div>
+            </form>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Formateur·rice</th><th>Type</th><th>Date</th><th>Inscrits</th><th>Capacité</th><th>Actions</th></tr></thead><tbody>`;
+        const formations = Array.isArray(db.formations) ? db.formations : [];
+        if (formations.length === 0) {
+            html += `<tr><td colspan="6" style="text-align:center;color:#a0aec0;">Aucune formation.</td></tr>`;
+        } else {
+            formations.forEach(f => {
+                const count = Array.isArray(f.inscrits) ? f.inscrits.length : 0;
+                const cap = f.capacite || '∞';
+                html += `<tr><td>${f.prenom} ${f.nom}</td><td>${f.type||'—'}</td><td>${formatDate(f.dateFormation)}</td><td>${count}</td><td>${cap}</td>
+                    <td><div class="actions-cell">
+                        <button class="btn-secondary" data-action="editFormation" data-fid="${f.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Modifier</button>
+                        <button class="btn-danger" data-action="deleteFormation" data-fid="${f.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Supprimer</button>
+                    </div></td></tr>`;
+            });
+        }
+        html += `</tbody></table></div>`;
+        return html;
+    }
+
+    function initAdminFormations() {
+        const showBtn = document.getElementById('showCreateFormation');
+        const formDiv = document.getElementById('createFormationForm');
+        const cancelBtn = document.getElementById('cancelCreateFormation');
+        if (showBtn) {
+            showBtn.addEventListener('click', () => { formDiv.style.display = formDiv.style.display==='none' ? 'block' : 'none'; });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => { formDiv.style.display = 'none'; });
+        }
+        const createForm = document.getElementById('formationCreateForm');
+        if (createForm) {
+            createForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const nom = document.getElementById('fNom').value.trim();
+                const prenom = document.getElementById('fPrenom').value.trim();
+                const type = document.getElementById('fType').value.trim();
+                const dateDebut = document.getElementById('fDateDebut').value;
+                const dateFin = document.getElementById('fDateFin').value;
+                const dateFormation = document.getElementById('fDateFormation').value;
+                const lieu = document.getElementById('fLieu').value.trim();
+                const description = document.getElementById('fDescription').value.trim();
+                const capacite = parseInt(document.getElementById('fCapacite').value) || Infinity;
+                if (!nom || !prenom || !dateDebut || !dateFin || !dateFormation) {
+                    document.getElementById('createFormationMsg').textContent = 'Tous les champs obligatoires doivent être remplis.';
+                    document.getElementById('createFormationMsg').className = 'error-msg';
+                    return;
+                }
+                if (dateDebut > dateFin) {
+                    document.getElementById('createFormationMsg').textContent = 'La date de début d\'inscription doit être avant la date de fin.';
+                    document.getElementById('createFormationMsg').className = 'error-msg';
+                    return;
+                }
+                if (!db.nextId) db.nextId = { formation:1, ticket:1, announcement:1, faq:1, log:1 };
+                if (typeof db.nextId.formation !== 'number' || isNaN(db.nextId.formation)) db.nextId.formation = 1;
+                const formation = {
+                    id: db.nextId.formation++,
+                    nom, prenom,
+                    type: type || 'Générale',
+                    dateDebutInscription: dateDebut,
+                    dateFinInscription: dateFin,
+                    dateFormation,
+                    lieu: lieu || '—',
+                    description: description || '',
+                    capacite: capacite,
+                    inscrits: [],
+                    waitlist: [],
+                    evaluations: []
+                };
+                if (!Array.isArray(db.formations)) db.formations = [];
+                db.formations.push(formation);
+                saveDB(db);
+                document.getElementById('createFormationMsg').textContent = 'Formation créée avec succès !';
+                document.getElementById('createFormationMsg').className = 'success-msg';
+                createForm.reset();
+                setTimeout(() => { formDiv.style.display = 'none'; renderApp(); }, 600);
+            });
+        }
+        document.querySelectorAll('[data-action="deleteFormation"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const fid = parseInt(btn.dataset.fid);
+                if (confirm('Supprimer cette formation ?')) {
+                    if (Array.isArray(db.formations)) db.formations = db.formations.filter(f => f.id !== fid);
+                    saveDB(db);
+                    renderApp();
+                }
+            });
+        });
+        document.querySelectorAll('[data-action="editFormation"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const fid = parseInt(btn.dataset.fid);
+                const f = findFormation(db, fid);
+                if (!f) return;
+                const newNom = prompt('Nom du formateur·rice :', f.nom);
+                if (newNom === null) return;
+                const newPrenom = prompt('Prénom :', f.prenom);
+                if (newPrenom === null) return;
+                const newType = prompt('Type :', f.type || '');
+                const newLieu = prompt('Lieu :', f.lieu || '');
+                const newDesc = prompt('Description :', f.description || '');
+                const newCap = prompt('Capacité (vide = illimité) :', f.capacite || '');
+                f.nom = newNom.trim() || f.nom;
+                f.prenom = newPrenom.trim() || f.prenom;
+                f.type = newType.trim() || f.type;
+                f.lieu = newLieu.trim() || f.lieu;
+                f.description = newDesc.trim() || f.description;
+                f.capacite = newCap.trim() ? parseInt(newCap) : Infinity;
+                saveDB(db);
+                renderApp();
+            });
+        });
+        document.getElementById('importFormationsBtn')?.addEventListener('click', () => {
+            document.getElementById('csvFormationInput').click();
+        });
+        document.getElementById('csvFormationInput')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const text = ev.target.result;
+                const lines = text.split('\n').filter(line => line.trim());
+                if (lines.length < 2) { alert('Fichier CSV invalide.'); return; }
+                const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const nomIdx = header.indexOf('nom');
+                const prenomIdx = header.indexOf('prenom');
+                const typeIdx = header.indexOf('type');
+                const dateDebutIdx = header.indexOf('datedebutinscription');
+                const dateFinIdx = header.indexOf('datefininscription');
+                const dateFormationIdx = header.indexOf('dateformation');
+                const lieuIdx = header.indexOf('lieu');
+                const descIdx = header.indexOf('description');
+                const capIdx = header.indexOf('capacite');
+                if (nomIdx === -1 || prenomIdx === -1 || dateDebutIdx === -1 || dateFinIdx === -1 || dateFormationIdx === -1) {
+                    alert('Colonnes requises : nom, prenom, dateDebutInscription, dateFinInscription, dateFormation');
+                    return;
+                }
+                let created = 0;
+                for (let i=1; i<lines.length; i++) {
+                    const cols = lines[i].split(',').map(c => c.trim());
+                    if (cols.length < 5) continue;
+                    const nom = cols[nomIdx] || '';
+                    const prenom = cols[prenomIdx] || '';
+                    const type = (typeIdx>=0 && cols[typeIdx]) || 'Générale';
+                    const dateDebut = cols[dateDebutIdx] || '';
+                    const dateFin = cols[dateFinIdx] || '';
+                    const dateFormation = cols[dateFormationIdx] || '';
+                    const lieu = (lieuIdx>=0 && cols[lieuIdx]) || '—';
+                    const description = (descIdx>=0 && cols[descIdx]) || '';
+                    const capacite = (capIdx>=0 && cols[capIdx]) ? parseInt(cols[capIdx]) : Infinity;
+                    if (!nom || !prenom || !dateDebut || !dateFin || !dateFormation) continue;
+                    if (!db.nextId) db.nextId = { formation:1, ticket:1, announcement:1, faq:1, log:1 };
+                    if (typeof db.nextId.formation !== 'number' || isNaN(db.nextId.formation)) db.nextId.formation = 1;
+                    db.formations.push({
+                        id: db.nextId.formation++,
+                        nom, prenom, type,
+                        dateDebutInscription: dateDebut,
+                        dateFinInscription: dateFin,
+                        dateFormation,
+                        lieu, description,
+                        capacite,
+                        inscrits: [], waitlist: [], evaluations: []
+                    });
+                    created++;
+                }
+                saveDB(db);
+                alert(`${created} formation(s) importée(s).`);
+                file.value = '';
+                renderApp();
+            };
+            reader.readAsText(file, 'UTF-8');
+        });
+        document.getElementById('exportAllFormationsBtn')?.addEventListener('click', () => {
+            const formations = Array.isArray(db.formations) ? db.formations : [];
+            if (formations.length === 0) { alert('Aucune formation.'); return; }
+            let csv = 'nom,prenom,type,dateDebutInscription,dateFinInscription,dateFormation,lieu,description,capacite,inscrits\n';
+            formations.forEach(f => {
+                const inscrits = (Array.isArray(f.inscrits) ? f.inscrits : []).join(';');
+                csv += `${f.nom},${f.prenom},${f.type||''},${f.dateDebutInscription},${f.dateFinInscription},${f.dateFormation},${f.lieu||''},${f.description||''},${f.capacite||''},${inscrits}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'formations_complet.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+        document.getElementById('archiveToggleBtn')?.addEventListener('click', () => {
+            sessionStorage.setItem('showArchives', String(!(sessionStorage.getItem('showArchives')==='true')));
+            renderApp();
+        });
+    }
+
+    // ---- ADMIN COMPTES (avec rôle admin et édition) ----
+    function renderAdminComptes() {
+        let html = `<div style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+            <button class="btn-primary" id="showCreateUser" style="width:auto;padding:0.5rem 1.6rem;">+ Créer un compte</button>
+            <button class="btn-secondary" id="importUsersBtn" style="width:auto;padding:0.5rem 1.6rem;">📥 Importer CSV</button>
+            <button class="btn-secondary" id="exportUsersBtn" style="width:auto;padding:0.5rem 1.6rem;">📤 Exporter CSV</button>
+            <input type="file" id="csvUserInput" accept=".csv" style="display:none;" />
+        </div>
+        <div id="createUserForm" style="display:none;background:#f8faff;padding:1.5rem;border-radius:16px;border:1px solid #e9eef4;margin-bottom:2rem;">
+            <h4 style="margin-bottom:1rem;">Créer un compte</h4>
+            <form id="userCreateForm">
+                <div class="form-row"><div class="form-group"><label>Nom</label><input type="text" id="uNom" required /></div>
+                    <div class="form-group"><label>Prénom</label><input type="text" id="uPrenom" required /></div></div>
+                <div class="form-group"><label>Rôle</label><select id="uRole">
+                    <option value="professeur">Professeur</option>
+                    <option value="personnel">Personnel</option>
+                    <option value="admin">Admin</option>
+                </select></div>
+                <button type="submit" class="btn-primary" style="width:auto;padding:0.5rem 2rem;">Créer</button>
+                <button type="button" class="btn-secondary" id="cancelCreateUser" style="width:auto;padding:0.5rem 1.6rem;">Annuler</button>
+                <div id="createUserMsg"></div>
+            </form>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Identifiant</th><th>Nom</th><th>Prénom</th><th>Rôle</th><th>Statut</th><th>Mot de passe provisoire</th><th>Actions</th></tr></thead><tbody>`;
+        const users = Array.isArray(db.users) ? db.users : [];
+        users.forEach(u => {
+            const isAdmin = u.role === 'admin';
+            const pwdDisplay = u.firstLogin ? u.password : '—';
+            html += `<tr><td><strong>${u.id}</strong></td><td>${u.nom}</td><td>${u.prenom}</td>
+                <td><span class="badge ${u.role}">${getRoleLabel(u.role)}</span></td>
+                <td>${u.firstLogin ? '🔑 Premier accès' : '✅ Actif'}</td>
+                <td>${!isAdmin ? (u.firstLogin ? `<span style="font-family:monospace;background:#f0f4fe;padding:0.1rem 0.4rem;border-radius:4px;">${pwdDisplay}</span>` : '—') : '—'}</td>
+                <td><div class="actions-cell">
+                    ${!isAdmin || u.id === currentUser.id ? `
+                        <button class="btn-secondary" data-action="editUser" data-uid="${u.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">✏️ Modifier</button>
+                        <button class="btn-secondary" data-action="changePwd" data-uid="${u.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">🔑 Changer MDP</button>
+                        ${u.id !== 'admin' ? `<button class="btn-danger" data-action="deleteUser" data-uid="${u.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Supprimer</button>` : ''}
+                    ` : '<span style="font-size:0.75rem;color:#a0aec0;">Admin</span>'}
+                </div></td></tr>`;
+        });
+        html += `</tbody></table></div>
+            <div style="margin-top:1rem;font-size:0.85rem;color:#5e6f8d;">
+                <p><strong>Import CSV :</strong> format <code>nom,prenom,role</code> (role = professeur, personnel ou admin)</p>
+                <p><strong>Export :</strong> télécharge la liste au même format.</p>
+            </div>`;
+        return html;
+    }
+
+    function initAdminComptes() {
+        const showBtn = document.getElementById('showCreateUser');
+        const formDiv = document.getElementById('createUserForm');
+        const cancelBtn = document.getElementById('cancelCreateUser');
+        if (showBtn) {
+            showBtn.addEventListener('click', () => { formDiv.style.display = formDiv.style.display==='none' ? 'block' : 'none'; });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => { formDiv.style.display = 'none'; });
+        }
+        const createForm = document.getElementById('userCreateForm');
+        if (createForm) {
+            createForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const nom = document.getElementById('uNom').value.trim();
+                const prenom = document.getElementById('uPrenom').value.trim();
+                const role = document.getElementById('uRole').value;
+                if (!nom || !prenom) {
+                    document.getElementById('createUserMsg').textContent = 'Nom et prénom requis.';
+                    document.getElementById('createUserMsg').className = 'error-msg';
+                    return;
+                }
+                const id = nom.toLowerCase();
+                if (findUser(db, id)) {
+                    document.getElementById('createUserMsg').textContent = 'Un utilisateur avec ce nom existe déjà.';
+                    document.getElementById('createUserMsg').className = 'error-msg';
+                    return;
+                }
+                const pwd = generatePassword();
+                if (!Array.isArray(db.users)) db.users = [];
+                db.users.push({
+                    id, nom, prenom,
+                    password: pwd,
+                    role,
+                    firstLogin: true,
+                    preferences: { theme: 'light' },
+                    loginAttempts: 0,
+                    lockedUntil: null
+                });
+                saveDB(db);
+                document.getElementById('createUserMsg').textContent = `Compte créé : ID = ${id}, mot de passe = ${pwd} (à modifier lors du premier accès)`;
+                document.getElementById('createUserMsg').className = 'success-msg';
+                createForm.reset();
+                setTimeout(() => { formDiv.style.display = 'none'; renderApp(); }, 1200);
+            });
+        }
+        // Éditer un utilisateur (admin)
+        document.querySelectorAll('[data-action="editUser"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const uid = btn.dataset.uid;
+                const user = findUser(db, uid);
+                if (!user) return;
+                const newNom = prompt('Nouveau nom :', user.nom);
+                if (newNom === null) return;
+                const newPrenom = prompt('Nouveau prénom :', user.prenom);
+                if (newPrenom === null) return;
+                let newRole = user.role;
+                if (uid !== 'admin') {
+                    const rolePrompt = prompt('Nouveau rôle (professeur, personnel, admin) :', user.role);
+                    if (rolePrompt !== null && ['professeur','personnel','admin'].includes(rolePrompt.toLowerCase())) {
+                        newRole = rolePrompt.toLowerCase();
+                    }
+                }
+                if (updateUserProfile(uid, newNom.trim(), newPrenom.trim(), newRole)) {
+                    if (uid === currentUser.id) {
+                        currentUser = findUser(db, uid);
+                    }
+                    renderApp();
+                    alert('Profil mis à jour.');
+                } else {
+                    alert('Erreur lors de la mise à jour.');
+                }
+            });
+        });
+        document.querySelectorAll('[data-action="changePwd"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const uid = btn.dataset.uid;
+                const user = findUser(db, uid);
+                if (!user) return;
+                const choice = confirm(`Changer le mot de passe de ${uid} ?\n"OK" pour générer aléatoirement, "Annuler" pour personnaliser.`);
+                let newPwd;
+                if (choice) {
+                    newPwd = generatePassword();
+                } else {
+                    newPwd = prompt('Nouveau mot de passe (min 4 caractères) :');
+                    if (!newPwd || newPwd.length < 4) { alert('Mot de passe invalide.'); return; }
+                }
+                if (changePassword(uid, newPwd, true)) {
+                    addLog(db, currentUser.id, 'change_password', `Mot de passe modifié pour ${uid}`);
+                    addNotification(db, uid, `Votre mot de passe a été réinitialisé par l'administrateur. Connectez-vous avec le nouveau mot de passe.`);
+                    alert(`Mot de passe modifié. Nouveau mot de passe : ${newPwd}`);
+                    renderApp();
+                } else { alert('Erreur.'); }
+            });
+        });
+        document.querySelectorAll('[data-action="deleteUser"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const uid = btn.dataset.uid;
+                if (uid === 'admin') { alert('Le compte admin ne peut pas être supprimé.'); return; }
+                if (confirm(`Supprimer l'utilisateur ${uid} ?`)) {
+                    if (Array.isArray(db.users)) db.users = db.users.filter(u => u.id !== uid);
+                    if (Array.isArray(db.formations)) {
+                        db.formations.forEach(f => {
+                            if (Array.isArray(f.inscrits)) f.inscrits = f.inscrits.filter(id => id !== uid);
+                            if (Array.isArray(f.waitlist)) f.waitlist = f.waitlist.filter(id => id !== uid);
+                        });
+                    }
+                    saveDB(db);
+                    renderApp();
+                }
+            });
+        });
+        document.getElementById('exportUsersBtn')?.addEventListener('click', () => {
+            const users = Array.isArray(db.users) ? db.users : [];
+            const nonAdmin = users.filter(u => u.role !== 'admin');
+            if (nonAdmin.length === 0) { alert('Aucun utilisateur non-admin à exporter.'); return; }
+            let csv = 'nom,prenom,role\n';
+            nonAdmin.forEach(u => { csv += `${u.nom},${u.prenom},${u.role}\n`; });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'utilisateurs_arena.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+        document.getElementById('importUsersBtn')?.addEventListener('click', () => {
+            document.getElementById('csvUserInput').click();
+        });
+        document.getElementById('csvUserInput')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const text = ev.target.result;
+                const lines = text.split('\n').filter(line => line.trim());
+                if (lines.length < 2) { alert('Fichier CSV invalide.'); return; }
+                const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const nomIdx = header.indexOf('nom');
+                const prenomIdx = header.indexOf('prenom');
+                const roleIdx = header.indexOf('role');
+                if (nomIdx === -1 || prenomIdx === -1 || roleIdx === -1) {
+                    alert('Le CSV doit contenir les colonnes : nom, prenom, role');
+                    return;
+                }
+                let created = 0, skipped = 0;
+                for (let i=1; i<lines.length; i++) {
+                    const cols = lines[i].split(',').map(c => c.trim());
+                    if (cols.length < 3) continue;
+                    const nom = cols[nomIdx] || '';
+                    const prenom = cols[prenomIdx] || '';
+                    let role = cols[roleIdx] || '';
+                    if (!nom || !prenom) continue;
+                    role = role.toLowerCase();
+                    if (!['professeur','personnel','admin'].includes(role)) role = 'personnel';
+                    const id = nom.toLowerCase();
+                    if (findUser(db, id)) { skipped++; continue; }
+                    const pwd = generatePassword();
+                    if (!Array.isArray(db.users)) db.users = [];
+                    db.users.push({
+                        id, nom, prenom,
+                        password: pwd,
+                        role,
+                        firstLogin: true,
+                        preferences: { theme: 'light' },
+                        loginAttempts: 0,
+                        lockedUntil: null
+                    });
+                    created++;
+                }
+                saveDB(db);
+                alert(`Import terminé : ${created} compte(s) créé(s), ${skipped} ignoré(s) (existants).`);
+                file.value = '';
+                renderApp();
+            };
+            reader.readAsText(file, 'UTF-8');
+        });
+    }
+
+    // ---- ADMIN ANNONCES (identique) ----
+    function renderAdminAnnonces() {
+        let html = `<div style="margin-bottom:1rem;"><button class="btn-primary" id="showCreateAnnonce" style="width:auto;padding:0.5rem 1.6rem;">+ Nouvelle annonce</button></div>
+        <div id="createAnnonceForm" style="display:none;background:#f8faff;padding:1.5rem;border-radius:16px;border:1px solid #e9eef4;margin-bottom:2rem;">
+            <h4>Créer une annonce</h4>
+            <form id="annonceCreateForm">
+                <div class="form-group"><label>Titre</label><input type="text" id="aTitre" required /></div>
+                <div class="form-group"><label>Contenu</label><textarea id="aContenu" rows="3" required></textarea></div>
+                <button type="submit" class="btn-primary" style="width:auto;padding:0.5rem 2rem;">Publier</button>
+                <button type="button" class="btn-secondary" id="cancelCreateAnnonce" style="width:auto;padding:0.5rem 1.6rem;">Annuler</button>
+                <div id="createAnnonceMsg"></div>
+            </form>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Titre</th><th>Contenu</th><th>Date</th><th>Actions</th></tr></thead><tbody>`;
+        const annonces = Array.isArray(db.announcements) ? db.announcements : [];
+        if (annonces.length === 0) {
+            html += `<tr><td colspan="4" style="text-align:center;color:#a0aec0;">Aucune annonce.</td></tr>`;
+        } else {
+            annonces.forEach(a => {
+                html += `<tr><td><strong>${a.titre}</strong></td><td>${a.contenu}</td><td>${new Date(a.timestamp).toLocaleString()}</td>
+                    <td><button class="btn-danger" data-action="deleteAnnonce" data-aid="${a.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Supprimer</button></td></tr>`;
+            });
+        }
+        html += `</tbody></table></div>`;
+        return html;
+    }
+
+    function initAdminAnnonces() {
+        const showBtn = document.getElementById('showCreateAnnonce');
+        const formDiv = document.getElementById('createAnnonceForm');
+        const cancelBtn = document.getElementById('cancelCreateAnnonce');
+        if (showBtn) {
+            showBtn.addEventListener('click', () => { formDiv.style.display = formDiv.style.display==='none' ? 'block' : 'none'; });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => { formDiv.style.display = 'none'; });
+        }
+        const createForm = document.getElementById('annonceCreateForm');
+        if (createForm) {
+            createForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const titre = document.getElementById('aTitre').value.trim();
+                const contenu = document.getElementById('aContenu').value.trim();
+                if (!titre || !contenu) {
+                    document.getElementById('createAnnonceMsg').textContent = 'Tous les champs sont requis.';
+                    document.getElementById('createAnnonceMsg').className = 'error-msg';
+                    return;
+                }
+                if (!Array.isArray(db.announcements)) db.announcements = [];
+                if (!db.nextId) db.nextId = { formation:1, ticket:1, announcement:1, faq:1, log:1 };
+                if (typeof db.nextId.announcement !== 'number' || isNaN(db.nextId.announcement)) db.nextId.announcement = 1;
+                db.announcements.push({
+                    id: db.nextId.announcement++,
+                    titre, contenu,
+                    timestamp: new Date().toISOString()
+                });
+                saveDB(db);
+                document.getElementById('createAnnonceMsg').textContent = 'Annonce publiée !';
+                document.getElementById('createAnnonceMsg').className = 'success-msg';
+                createForm.reset();
+                setTimeout(() => { formDiv.style.display = 'none'; renderApp(); }, 500);
+            });
+        }
+        document.querySelectorAll('[data-action="deleteAnnonce"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const aid = parseInt(btn.dataset.aid);
+                if (confirm('Supprimer cette annonce ?')) {
+                    if (Array.isArray(db.announcements)) db.announcements = db.announcements.filter(a => a.id !== aid);
+                    saveDB(db);
+                    renderApp();
+                }
+            });
+        });
+    }
+
+    // ---- ADMIN FAQ (identique) ----
+    function renderAdminFAQ() {
+        let html = `<div style="margin-bottom:1rem;"><button class="btn-primary" id="showCreateFaq" style="width:auto;padding:0.5rem 1.6rem;">+ Nouvelle FAQ</button></div>
+        <div id="createFaqForm" style="display:none;background:#f8faff;padding:1.5rem;border-radius:16px;border:1px solid #e9eef4;margin-bottom:2rem;">
+            <h4>Ajouter une question/réponse</h4>
+            <form id="faqCreateForm">
+                <div class="form-group"><label>Question</label><input type="text" id="faqQuestion" required /></div>
+                <div class="form-group"><label>Réponse</label><textarea id="faqReponse" rows="3" required></textarea></div>
+                <button type="submit" class="btn-primary" style="width:auto;padding:0.5rem 2rem;">Ajouter</button>
+                <button type="button" class="btn-secondary" id="cancelCreateFaq" style="width:auto;padding:0.5rem 1.6rem;">Annuler</button>
+                <div id="createFaqMsg"></div>
+            </form>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Question</th><th>Réponse</th><th>Actions</th></tr></thead><tbody>`;
+        const faqs = Array.isArray(db.faqs) ? db.faqs : [];
+        if (faqs.length === 0) {
+            html += `<tr><td colspan="3" style="text-align:center;color:#a0aec0;">Aucune FAQ.</td></tr>`;
+        } else {
+            faqs.forEach(f => {
+                html += `<tr><td><strong>${f.question}</strong></td><td>${f.reponse}</td>
+                    <td><button class="btn-danger" data-action="deleteFaq" data-fid="${f.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Supprimer</button></td></tr>`;
+            });
+        }
+        html += `</tbody></table></div>`;
+        return html;
+    }
+
+    function initAdminFAQ() {
+        const showBtn = document.getElementById('showCreateFaq');
+        const formDiv = document.getElementById('createFaqForm');
+        const cancelBtn = document.getElementById('cancelCreateFaq');
+        if (showBtn) {
+            showBtn.addEventListener('click', () => { formDiv.style.display = formDiv.style.display==='none' ? 'block' : 'none'; });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => { formDiv.style.display = 'none'; });
+        }
+        const createForm = document.getElementById('faqCreateForm');
+        if (createForm) {
+            createForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const question = document.getElementById('faqQuestion').value.trim();
+                const reponse = document.getElementById('faqReponse').value.trim();
+                if (!question || !reponse) {
+                    document.getElementById('createFaqMsg').textContent = 'Tous les champs sont requis.';
+                    document.getElementById('createFaqMsg').className = 'error-msg';
+                    return;
+                }
+                if (!Array.isArray(db.faqs)) db.faqs = [];
+                db.faqs.push({ id: Date.now()+Math.random(), question, reponse });
+                saveDB(db);
+                document.getElementById('createFaqMsg').textContent = 'FAQ ajoutée !';
+                document.getElementById('createFaqMsg').className = 'success-msg';
+                createForm.reset();
+                setTimeout(() => { formDiv.style.display = 'none'; renderApp(); }, 500);
+            });
+        }
+        document.querySelectorAll('[data-action="deleteFaq"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const fid = parseInt(btn.dataset.fid);
+                if (confirm('Supprimer cette FAQ ?')) {
+                    if (Array.isArray(db.faqs)) db.faqs = db.faqs.filter(f => f.id !== fid);
+                    saveDB(db);
+                    renderApp();
+                }
+            });
+        });
+    }
+
+    // ---- ADMIN TICKETS (identique) ----
+    function renderAdminTickets() {
+        let html = `<div class="table-wrap"><table><thead><tr><th>#</th><th>Utilisateur</th><th>Sujet</th><th>Message</th><th>Statut</th><th>Réponse</th><th>Actions</th></tr></thead><tbody>`;
+        const tickets = Array.isArray(db.tickets) ? db.tickets : [];
+        if (tickets.length === 0) {
+            html += `<tr><td colspan="7" style="text-align:center;color:#a0aec0;">Aucun ticket.</td></tr>`;
+        } else {
+            tickets.forEach(t => {
+                html += `<tr><td>${t.id}</td><td>${getUserName(db, t.userId)}</td><td><strong>${t.sujet}</strong></td>
+                    <td>${t.message}</td><td><span class="ticket-status ${t.status}">${t.status}</span></td>
+                    <td>${t.reponse || '—'}</td>
+                    <td><div class="actions-cell">
+                        ${t.status !== 'fermé' ? `<button class="btn-secondary" data-action="repondreTicket" data-tid="${t.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Répondre</button>` : ''}
+                        <button class="btn-secondary" data-action="changerStatutTicket" data-tid="${t.id}" style="padding:0.2rem 0.8rem;font-size:0.8rem;">Statut</button>
+                    </div></td></tr>`;
+            });
+        }
+        html += `</tbody></table></div>`;
+        return html;
+    }
+
+    function initAdminTickets() {
+        document.querySelectorAll('[data-action="repondreTicket"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tid = parseInt(btn.dataset.tid);
+                const ticket = findTicket(db, tid);
+                if (!ticket) return;
+                const reponse = prompt('Votre réponse :');
+                if (reponse === null) return;
+                if (!reponse.trim()) { alert('Réponse vide.'); return; }
+                ticket.reponse = reponse.trim();
+                ticket.status = 'résolu';
+                saveDB(db);
+                addNotification(db, ticket.userId, `Réponse à votre ticket "${ticket.sujet}" : ${reponse.trim()}`);
+                addLog(db, currentUser.id, 'ticket_repondu', `Ticket #${tid}`);
+                renderApp();
+            });
+        });
+        document.querySelectorAll('[data-action="changerStatutTicket"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tid = parseInt(btn.dataset.tid);
+                const ticket = findTicket(db, tid);
+                if (!ticket) return;
+                const newStatus = prompt('Nouveau statut (ouvert, en cours, résolu, fermé) :', ticket.status);
+                if (!newStatus) return;
+                const valid = ['ouvert','en cours','résolu','fermé'];
+                if (!valid.includes(newStatus.toLowerCase())) { alert('Statut invalide.'); return; }
+                ticket.status = newStatus.toLowerCase();
+                saveDB(db);
+                renderApp();
+            });
+        });
+    }
+
+    // ---- ADMIN BANDEAU (identique) ----
+    function renderAdminBandeau() {
+        const b = db.banner || { text: '', color: '#f9e9b0', active: false };
+        return `<div style="background:#f8faff;padding:1.5rem;border-radius:16px;border:1px solid #e9eef4;">
+            <h4 style="margin-bottom:1rem;">Configurer le bandeau d'informations</h4>
+            <form id="bannerForm">
+                <div class="form-group"><label>Texte du bandeau</label><input type="text" id="bannerTextInput" value="${b.text||''}" placeholder="Message d'information..." /></div>
+                <div class="form-group"><label>Couleur de fond</label><input type="color" id="bannerColorInput" value="${b.color||'#f9e9b0'}" style="width:60px;height:40px;padding:2px;border:2px solid #dce3ed;border-radius:8px;" /></div>
+                <div class="form-group" style="display:flex;align-items:center;gap:1rem;">
+                    <label style="margin-bottom:0;">Activer le bandeau</label>
+                    <input type="checkbox" id="bannerActiveInput" ${b.active ? 'checked' : ''} style="width:20px;height:20px;" />
+                </div>
+                <button type="submit" class="btn-primary" style="width:auto;padding:0.5rem 2rem;">Enregistrer</button>
+                <div id="bannerFormMsg" class="success-msg"></div>
+            </form>
+            <div style="margin-top:1.5rem;padding:1rem;background:${b.active ? (b.color||'#f9e9b0') : '#f0f0f0'};border-radius:12px;border:2px dashed ${b.active ? (b.color||'#f9e9b0') : '#dce3ed'};">
+                <strong>Aperçu :</strong> ${b.active ? (b.text||'—') : '⛔ Bandeau désactivé'}
+            </div>
+        </div>`;
+    }
+
+    function initAdminBandeau() {
+        const form = document.getElementById('bannerForm');
+        if (!form) return;
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = document.getElementById('bannerTextInput').value.trim();
+            const color = document.getElementById('bannerColorInput').value;
+            const active = document.getElementById('bannerActiveInput').checked;
+            db.banner = { text: text || 'Message d\'information', color, active };
+            saveDB(db);
+            document.getElementById('bannerFormMsg').textContent = 'Bandeau mis à jour !';
+            setTimeout(() => { document.getElementById('bannerFormMsg').textContent = ''; }, 3000);
+            renderBanner();
+            renderApp();
+        });
+    }
+
+    // ---- ADMIN PARAMÈTRES (avec réinitialisation) ----
+    function renderAdminParametres() {
+        const s = db.settings || {};
+        return `<div style="background:#f8faff;padding:1.5rem;border-radius:16px;border:1px solid #e9eef4;">
+            <h4 style="margin-bottom:1rem;">Paramètres généraux</h4>
+            <form id="settingsForm">
+                <div class="form-group"><label>Thème par défaut</label><select id="settingTheme">
+                    <option value="light" ${s.theme==='light'?'selected':''}>Clair</option>
+                    <option value="dark" ${s.theme==='dark'?'selected':''}>Sombre</option>
+                </select></div>
+                <div class="form-group"><label>Langue</label><select id="settingLang">
+                    <option value="fr" ${s.language==='fr'?'selected':''}>Français</option>
+                    <option value="en" ${s.language==='en'?'selected':''}>Anglais</option>
+                </select></div>
+                <div class="form-group"><label>Tentatives de connexion max avant verrouillage</label><input type="number" id="settingMaxAttempts" value="${s.maxLoginAttempts||3}" min="1" max="10" /></div>
+                <div class="form-group"><label>Durée du verrouillage (minutes)</label><input type="number" id="settingLockDuration" value="${s.lockDuration||5}" min="1" max="60" /></div>
+                <button type="submit" class="btn-primary" style="width:auto;padding:0.5rem 2rem;">Enregistrer</button>
+                <div id="settingsMsg" class="success-msg"></div>
+            </form>
+            <hr style="margin:2rem 0;border-color:#e9eef4;" />
+            <h4>Journaux de connexion</h4>
+            <button class="btn-secondary" id="viewLogsBtn">📋 Voir les logs</button>
+            <button class="btn-secondary" id="clearLogsBtn" style="margin-left:0.5rem;">🗑️ Effacer les logs</button>
+            <div id="logsContainer" style="margin-top:1rem;max-height:300px;overflow-y:auto;background:#fff;border:1px solid #e9eef4;border-radius:8px;padding:0.5rem;display:none;">
+                ${(Array.isArray(db.logs) ? db.logs : []).slice().reverse().map(l => `<div style="font-size:0.8rem;padding:0.2rem 0;border-bottom:1px solid #f0f4fe;"><strong>${l.userId}</strong> ${l.action} — ${l.details} (${new Date(l.timestamp).toLocaleString()}) IP: ${l.ip}</div>`).join('')}
+            </div>
+            <div style="margin-top:2rem;">
+                <h4>Import / Export complet (JSON)</h4>
+                <button class="btn-secondary" id="exportFullBtn">📤 Exporter toutes les données</button>
+                <button class="btn-secondary" id="importFullBtn" style="margin-left:0.5rem;">📥 Importer JSON</button>
+                <input type="file" id="jsonImportInput" accept=".json" style="display:none;" />
+            </div>
+            <hr style="margin:2rem 0;border-color:#e9eef4;" />
+            <div style="border:2px solid #c72a3a;padding:1rem;border-radius:10px;background:#fff5f5;">
+                <h4 style="color:#c72a3a;">⚠️ Zone de réinitialisation</h4>
+                <p style="font-size:0.9rem;">Supprime toutes les données et recrée une base vierge (seul le compte admin sera conservé). Cette action est irréversible.</p>
+                <button class="btn-danger" id="resetDBBtn" style="margin-top:0.5rem;">🔄 Réinitialiser la base</button>
+                <div id="resetMsg" class="error-msg"></div>
+            </div>
+        </div>`;
+    }
+
+    function initAdminParametres() {
+        const form = document.getElementById('settingsForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const theme = document.getElementById('settingTheme').value;
+                const language = document.getElementById('settingLang').value;
+                const maxAttempts = parseInt(document.getElementById('settingMaxAttempts').value) || 3;
+                const lockDuration = parseInt(document.getElementById('settingLockDuration').value) || 5;
+                db.settings.theme = theme;
+                db.settings.language = language;
+                db.settings.maxLoginAttempts = maxAttempts;
+                db.settings.lockDuration = lockDuration;
+                saveDB(db);
+                document.getElementById('settingsMsg').textContent = 'Paramètres enregistrés !';
+                applyTheme();
+                setTimeout(() => { document.getElementById('settingsMsg').textContent = ''; }, 3000);
+            });
+        }
+        document.getElementById('viewLogsBtn')?.addEventListener('click', () => {
+            const container = document.getElementById('logsContainer');
+            container.style.display = container.style.display === 'none' ? 'block' : 'none';
+        });
+        document.getElementById('clearLogsBtn')?.addEventListener('click', () => {
+            if (confirm('Effacer tous les logs ?')) {
+                db.logs = [];
+                saveDB(db);
+                renderApp();
+                alert('Logs effacés.');
+            }
+        });
+        document.getElementById('exportFullBtn')?.addEventListener('click', () => {
+            const data = JSON.stringify(db, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'arena_backup.json';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+        document.getElementById('importFullBtn')?.addEventListener('click', () => {
+            document.getElementById('jsonImportInput').click();
+        });
+        document.getElementById('jsonImportInput')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const imported = JSON.parse(ev.target.result);
+                    if (confirm('Remplacer toutes les données actuelles ?')) {
+                        const admin = imported.users.find(u => u.id === 'admin');
+                        if (!admin) { alert('Le fichier importé ne contient pas de compte admin.'); return; }
+                        db = imported;
+                        db = sanitizeDB(db);
+                        saveDB(db);
+                        currentUser = findUser(db, currentUser.id);
+                        renderApp();
+                        alert('Données importées avec succès !');
+                    }
+                } catch(err) { alert('Fichier JSON invalide.'); }
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('resetDBBtn')?.addEventListener('click', () => {
+            if (confirm('⚠️ Êtes-vous sûr de vouloir réinitialiser toute la base de données ? Cette action est irréversible.')) {
+                db = createDefaultDB();
+                db = sanitizeDB(db);
+                saveDB(db);
+                currentUser = findUser(db, 'admin');
+                if (!currentUser) currentUser = db.users[0];
+                renderApp();
+                document.getElementById('resetMsg').textContent = '✅ Base réinitialisée avec succès !';
+                document.getElementById('resetMsg').className = 'success-msg';
+                setTimeout(() => { document.getElementById('resetMsg').textContent = ''; }, 3000);
+            }
+        });
+    }
+
+    // ============================================================
+    //  STARTUP & LOGIN (avec spinner)
+    // ============================================================
+    function checkAdminAndStart() {
+        if (!dbLoaded) return;
+        const admin = db.users.find(u => u.id === 'admin');
+        if (admin && admin.firstLogin) {
+            admin.password = 'admin';
+            saveDB(db);
+        }
+        if (!admin) {
+            db.users.push({
+                id: 'admin',
+                nom: 'Admin',
+                prenom: 'Système',
+                password: 'admin',
+                role: 'admin',
+                firstLogin: true,
+                preferences: { theme: 'light' },
+                loginAttempts: 0,
+                lockedUntil: null
+            });
+            saveDB(db);
+        }
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('firstLoginScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'none';
+        console.log('🏫 ARENA Portail chargé avec Firebase.');
+        console.log('👤 Admin par défaut : admin / admin (première connexion)');
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!dbLoaded || !db) {
+            document.getElementById('loginError').textContent = 'Chargement des données en cours, veuillez patienter...';
+            return;
+        }
+        const id = document.getElementById('loginId').value.trim();
+        const pwd = document.getElementById('loginPassword').value;
+        const errEl = document.getElementById('loginError');
+        errEl.textContent = '';
+        if (!id || !pwd) { errEl.textContent = 'Veuillez remplir tous les champs.'; return; }
+        // Afficher le spinner
+        document.getElementById('loginSpinner').style.display = 'inline-block';
+        document.getElementById('loginBtn').disabled = true;
+        setTimeout(() => {
+            const result = login(id, pwd);
+            document.getElementById('loginSpinner').style.display = 'none';
+            document.getElementById('loginBtn').disabled = false;
+            if (!result.ok) {
+                errEl.textContent = result.msg;
+                return;
+            }
+            if (currentUser.firstLogin) {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('firstLoginScreen').style.display = 'flex';
+                document.getElementById('firstLoginError').textContent = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+            } else {
+                enterApp();
+            }
+        }, 300);
+    });
+
+    document.getElementById('firstLoginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const p1 = document.getElementById('newPassword').value;
+        const p2 = document.getElementById('confirmPassword').value;
+        const errEl = document.getElementById('firstLoginError');
+        errEl.textContent = '';
+        if (p1.length < 4) { errEl.textContent = 'Minimum 4 caractères.'; return; }
+        if (p1 !== p2) { errEl.textContent = 'Les mots de passe ne correspondent pas.'; return; }
+        if (changePassword(currentUser.id, p1, false)) {
+            currentUser = findUser(db, currentUser.id);
+            document.getElementById('firstLoginScreen').style.display = 'none';
+            enterApp();
+        } else {
+            errEl.textContent = 'Erreur lors de l\'enregistrement.';
+        }
+    });
+
+    function enterApp() {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('firstLoginScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'flex';
+        renderApp();
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        currentUser = null;
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginId').value = '';
+        document.getElementById('loginError').textContent = '';
+    });
+
+    document.getElementById('bannerClose').addEventListener('click', () => {
+        if (db.banner) {
+            db.banner.active = false;
+            saveDB(db);
+            renderBanner();
+        }
+    });
+</script>
+</body>
+</html>
